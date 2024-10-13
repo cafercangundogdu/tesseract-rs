@@ -13,6 +13,10 @@ categories = ["external-ffi-bindings", "computer-vision", "text-processing"]
 build = "build.rs"
 links = "tesseract"
 rust-version = "1.65"
+exclude = [
+    "third_party/*",
+    "tessdata/*",
+]
 
 [dependencies]
 libc = "0.2.159"
