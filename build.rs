@@ -60,7 +60,7 @@ fn main() {
 
 fn download_tessdata(project_dir: &PathBuf) {
     let tessdata_dir = project_dir.join("tessdata");
-    fs::create_dir_all(&tessdata_dir).expect("Failed to create tessdata directory");
+    fs::create_dir_all(&tessdata_dir).expect("Failed to create Tessdata directory");
 
     let languages = ["eng", "tur"];
     let base_url = "https://github.com/tesseract-ocr/tessdata_best/raw/refs/heads/main/";
@@ -68,11 +68,17 @@ fn download_tessdata(project_dir: &PathBuf) {
 
     for lang in &languages {
         let filename = format!("{}.traineddata", lang);
-        let url = format!("{}{}", base_url, filename);
-        let response = client.get(&url).send().expect("Failed to download tessdata");
-        let mut dest = fs::File::create(tessdata_dir.join(&filename)).expect("Failed to create file");
-        std::io::copy(&mut response.bytes().expect("Failed to get response bytes").as_ref(), &mut dest)
-            .expect("Failed to write tessdata");
-        println!("cargo:warning=Downloaded {}", filename);
+        let file_path = tessdata_dir.join(&filename);
+        
+        if !file_path.exists() {
+            let url = format!("{}{}", base_url, filename);
+            let response = client.get(&url).send().expect("Failed to download Tessdata");
+            let mut dest = fs::File::create(&file_path).expect("Failed to create file");
+            std::io::copy(&mut response.bytes().expect("Failed to get response bytes").as_ref(), &mut dest)
+                .expect("Failed to write Tessdata");
+            println!("cargo:warning={} downloaded", filename);
+        } else {
+            println!("cargo:warning={} already exists, skipping download", filename);
+        }
     }
 }
