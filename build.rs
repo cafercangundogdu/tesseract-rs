@@ -1,14 +1,20 @@
 #[cfg(feature = "build-tesseract")]
 mod build_tesseract {
     use std::env;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::fs;
     use cmake::Config;
     use reqwest::blocking::Client;
-
+    use std::process::Command;
+    
     pub fn build() {
         let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
         let project_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+
+        if should_init_submodules(&project_dir, &out_dir) {
+            init_submodules(&project_dir);
+            mark_submodules_initialized(&out_dir);
+        }
 
         download_tessdata(&project_dir);
 
@@ -84,7 +90,62 @@ mod build_tesseract {
             }
         }
     }
+
+    fn should_init_submodules(project_dir: &Path, out_dir: &Path) -> bool {
+        let submodule_marker = out_dir.join("submodules_initialized");
+        if submodule_marker.exists() {
+            return false;
+        }
+
+        let leptonica_dir = project_dir.join("third_party/leptonica");
+        let tesseract_dir = project_dir.join("third_party/tesseract");
+
+        !leptonica_dir.exists() || !tesseract_dir.exists()
+    }
+
+    fn init_submodules(project_dir: &Path) {
+        // Remove all submodules
+        run_git_command(project_dir, &["submodule", "deinit", "-f", "--all"]);
+
+        // Remove .git/modules directory
+        let git_modules_path = project_dir.join(".git/modules");
+        if git_modules_path.exists() {
+            fs::remove_dir_all(git_modules_path).expect("Failed to remove .git/modules");
+        }
+
+        // Add submodules
+        run_git_command(project_dir, &["submodule", "add", "-f", "https://github.com/DanBloomberg/leptonica.git", "third_party/leptonica"]);
+        run_git_command(project_dir, &["submodule", "add", "-f", "https://github.com/tesseract-ocr/tesseract.git", "third_party/tesseract"]);
+
+        // Update submodules
+        run_git_command(project_dir, &["submodule", "update", "--init", "--recursive", "--force"]);
+
+        // Run git gc
+        run_git_command(project_dir, &["gc", "--aggressive", "--prune=now"]);
+
+        // Run git fsck
+        run_git_command(project_dir, &["fsck", "--full"]);
+    }
+
+    fn run_git_command(project_dir: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .current_dir(project_dir)
+            .args(args)
+            .status()
+            .expect(&format!("Failed to run git command: {:?}", args));
+
+        if !status.success() {
+            panic!("Git command failed: {:?}", args);
+        }
+    }
+
+    fn mark_submodules_initialized(out_dir: &Path) {
+        let submodule_marker = out_dir.join("submodules_initialized");
+        fs::write(submodule_marker, "").expect("Failed to create submodule marker file");
+    }
 }
+
+
 
 fn main() {
     #[cfg(feature = "build-tesseract")]
