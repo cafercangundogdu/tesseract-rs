@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "build-tesseract"), allow(unused_variables, dead_code))]
+
 //! # tesseract-rs
 //!
 //! `tesseract-rs` provides safe Rust bindings for Tesseract OCR with built-in compilation
@@ -56,6 +58,7 @@ pub enum TesseractError {
 pub type Result<T> = std::result::Result<T, TesseractError>;
 
 /// Raw bindings to the Tesseract C API.
+#[cfg(feature = "build-tesseract")]
 #[link(name = "tesseract")]
 extern "C" {
     fn TessBaseAPICreate() -> *mut libc::c_void;
@@ -69,10 +72,12 @@ extern "C" {
 
 
 /// Main interface to the Tesseract OCR engine.
+#[cfg(feature = "build-tesseract")]
 pub struct TesseractAPI {
     handle: *mut libc::c_void,
 }
 
+#[cfg(feature = "build-tesseract")]
 impl TesseractAPI {
     /// Creates a new instance of the Tesseract API.
     pub fn new() -> Self {
@@ -181,6 +186,7 @@ impl TesseractAPI {
     }
 }
 
+#[cfg(feature = "build-tesseract")]
 impl Drop for TesseractAPI {
     fn drop(&mut self) {
         unsafe { TessBaseAPIDelete(self.handle) };
@@ -188,6 +194,7 @@ impl Drop for TesseractAPI {
 }
 
 #[cfg(test)]
+#[cfg(feature = "build-tesseract")]
 mod tests {
     use super::*;
     use std::env;

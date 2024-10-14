@@ -15,7 +15,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tesseract-rs = "0.1.0"
+tesseract-rs = { version = "0.1.0", features = ["build-tesseract"] }
 ```
 
 ## System Requirements
@@ -36,7 +36,7 @@ use tesseract_rs::TesseractAPI;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api = TesseractAPI::new();
     api.init("path/to/tessdata", "eng")?;
-    
+
     // Assume we have a 3x3 black and white image with a "1"
     let image_data: Vec<u8> = vec![
         0xFF, 0x00, 0xFF,
