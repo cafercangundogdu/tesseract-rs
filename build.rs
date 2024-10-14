@@ -1,24 +1,35 @@
 #[cfg(feature = "build-tesseract")]
 mod build_tesseract {
     use std::env;
-    use std::path::{Path, PathBuf};
     use std::fs;
-    use cmake::Config;
-    use reqwest::blocking::Client;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
-    
+    use cmake::Config;
+
+    const LEPTONICA_URL: &str = "https://github.com/DanBloomberg/leptonica/archive/refs/heads/master.zip";
+    const TESSERACT_URL: &str = "https://github.com/tesseract-ocr/tesseract/archive/refs/heads/main.zip";
+
     pub fn build() {
         let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
         let project_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        let third_party_dir = project_dir.join("third_party");
 
-        if should_init_submodules(&project_dir, &out_dir) {
-            init_submodules(&project_dir);
-            mark_submodules_initialized(&out_dir);
-        }
+        let (leptonica_dir, tesseract_dir) = if third_party_dir.exists() {
+            // Submodule scenario
+            (
+                third_party_dir.join("leptonica"),
+                third_party_dir.join("tesseract"),
+            )
+        } else {
+            // Download scenario
+            fs::create_dir_all(&third_party_dir).expect("Failed to create third_party directory");
+            (
+                download_and_extract(&third_party_dir, LEPTONICA_URL, "leptonica"),
+                download_and_extract(&third_party_dir, TESSERACT_URL, "tesseract"),
+            )
+        };
 
-        download_tessdata(&project_dir);
-
-        let leptonica_dir = project_dir.join("third_party/leptonica");
+        // Build Leptonica
         let leptonica_install_dir = out_dir.join("leptonica");
         let leptonica = Config::new(&leptonica_dir)
             .define("BUILD_PROG", "OFF")
@@ -36,7 +47,7 @@ mod build_tesseract {
         let leptonica_include_dir = leptonica_install_dir.join("include");
         let leptonica_lib_dir = leptonica_install_dir.join("lib");
 
-        let tesseract_dir = project_dir.join("third_party/tesseract");
+        // Build Tesseract
         let tesseract_install_dir = out_dir.join("tesseract");
         let tessdata_prefix = project_dir.join("tessdata");
         let tesseract = Config::new(&tesseract_dir)
@@ -64,15 +75,70 @@ mod build_tesseract {
         println!("cargo:warning=Leptonica lib dir: {:?}", leptonica_lib_dir);
         println!("cargo:warning=Tesseract install dir: {:?}", tesseract_install_dir);
         println!("cargo:warning=Tessdata dir: {:?}", tessdata_prefix);
+
+        download_tessdata(&project_dir);
     }
 
-    fn download_tessdata(project_dir: &PathBuf) {
+    fn download_and_extract(target_dir: &Path, url: &str, name: &str) -> PathBuf {
+        use reqwest::blocking::Client;
+        use zip::ZipArchive;
+        use std::io::Read;
+    
+        let client = Client::new();
+        let mut response = client.get(url).send().expect("Failed to download archive");
+        let mut content = Vec::new();
+        response.copy_to(&mut content).expect("Failed to read archive content");
+    
+        let temp_file = target_dir.join(format!("{}.zip", name));
+        fs::write(&temp_file, content).expect("Failed to write archive to file");
+    
+        let extract_dir = target_dir.join(name);
+        if extract_dir.exists() {
+            fs::remove_dir_all(&extract_dir).expect("Failed to remove existing directory");
+        }
+        fs::create_dir_all(&extract_dir).expect("Failed to create extraction directory");
+    
+        let mut archive = ZipArchive::new(fs::File::open(&temp_file).unwrap()).unwrap();
+    
+        // Extract files, ignoring the top-level directory
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).unwrap();
+            let file_path = file.sanitized_name();
+            let file_path = file_path.to_str().unwrap();
+            
+            // Skip the top-level directory
+            let path = Path::new(file_path);
+            let path = path.strip_prefix(path.components().next().unwrap()).unwrap();
+            
+            if path.as_os_str().is_empty() {
+                continue;
+            }
+    
+            let target_path = extract_dir.join(path);
+    
+            if file.is_dir() {
+                fs::create_dir_all(target_path).unwrap();
+            } else {
+                if let Some(parent) = target_path.parent() {
+                    fs::create_dir_all(parent).unwrap();
+                }
+                let mut outfile = fs::File::create(target_path).unwrap();
+                std::io::copy(&mut file, &mut outfile).unwrap();
+            }
+        }
+    
+        fs::remove_file(temp_file).expect("Failed to remove temporary zip file");
+    
+        extract_dir
+    }
+
+    fn download_tessdata(project_dir: &Path) {
         let tessdata_dir = project_dir.join("tessdata");
         fs::create_dir_all(&tessdata_dir).expect("Failed to create Tessdata directory");
 
         let languages = ["eng", "tur"];
-        let base_url = "https://github.com/tesseract-ocr/tessdata_best/raw/refs/heads/main/";
-        let client = Client::new();
+        let base_url = "https://github.com/tesseract-ocr/tessdata_best/raw/main/";
+        let client = reqwest::blocking::Client::new();
 
         for lang in &languages {
             let filename = format!("{}.traineddata", lang);
@@ -90,62 +156,7 @@ mod build_tesseract {
             }
         }
     }
-
-    fn should_init_submodules(project_dir: &Path, out_dir: &Path) -> bool {
-        let submodule_marker = out_dir.join("submodules_initialized");
-        if submodule_marker.exists() {
-            return false;
-        }
-
-        let leptonica_dir = project_dir.join("third_party/leptonica");
-        let tesseract_dir = project_dir.join("third_party/tesseract");
-
-        !leptonica_dir.exists() || !tesseract_dir.exists()
-    }
-
-    fn init_submodules(project_dir: &Path) {
-        // Remove all submodules
-        run_git_command(project_dir, &["submodule", "deinit", "-f", "--all"]);
-
-        // Remove .git/modules directory
-        let git_modules_path = project_dir.join(".git/modules");
-        if git_modules_path.exists() {
-            fs::remove_dir_all(git_modules_path).expect("Failed to remove .git/modules");
-        }
-
-        // Add submodules
-        run_git_command(project_dir, &["submodule", "add", "-f", "https://github.com/DanBloomberg/leptonica.git", "third_party/leptonica"]);
-        run_git_command(project_dir, &["submodule", "add", "-f", "https://github.com/tesseract-ocr/tesseract.git", "third_party/tesseract"]);
-
-        // Update submodules
-        run_git_command(project_dir, &["submodule", "update", "--init", "--recursive", "--force"]);
-
-        // Run git gc
-        run_git_command(project_dir, &["gc", "--aggressive", "--prune=now"]);
-
-        // Run git fsck
-        run_git_command(project_dir, &["fsck", "--full"]);
-    }
-
-    fn run_git_command(project_dir: &Path, args: &[&str]) {
-        let status = Command::new("git")
-            .current_dir(project_dir)
-            .args(args)
-            .status()
-            .expect(&format!("Failed to run git command: {:?}", args));
-
-        if !status.success() {
-            panic!("Git command failed: {:?}", args);
-        }
-    }
-
-    fn mark_submodules_initialized(out_dir: &Path) {
-        let submodule_marker = out_dir.join("submodules_initialized");
-        fs::write(submodule_marker, "").expect("Failed to create submodule marker file");
-    }
 }
-
-
 
 fn main() {
     #[cfg(feature = "build-tesseract")]
