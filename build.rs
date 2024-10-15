@@ -39,6 +39,7 @@ mod build_tesseract {
                   .env("CXX", "sccache c++");
         }
         leptonica_config
+            .define("CMAKE_BUILD_TYPE", "Release")
             .define("BUILD_PROG", "OFF")
             .define("BUILD_SHARED_LIBS", "OFF")
             .define("ENABLE_ZLIB", "OFF")
@@ -70,6 +71,7 @@ mod build_tesseract {
                   .env("CXX", "sccache c++");
         }
         tesseract_config
+            .define("CMAKE_BUILD_TYPE", "Release")
             .define("BUILD_TRAINING_TOOLS", "OFF")
             .define("BUILD_SHARED_LIBS", "OFF")
             .define("DISABLE_ARCHIVE", "ON")
