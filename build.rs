@@ -3,15 +3,29 @@ mod build_tesseract {
     use std::env;
     use std::fs;
     use std::path::{Path, PathBuf};
-    use std::process::Command;
     use cmake::Config;
 
     const LEPTONICA_URL: &str = "https://github.com/DanBloomberg/leptonica/archive/refs/heads/master.zip";
     const TESSERACT_URL: &str = "https://github.com/tesseract-ocr/tesseract/archive/refs/heads/main.zip";
 
     pub fn build() {
-        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-        let project_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        let home_dir = env::var("HOME").expect("HOME environment variable not set");
+        let custom_out_dir = PathBuf::from(home_dir).join(".tesseract-rs"); //.join("third_party");
+        std::fs::create_dir_all(&custom_out_dir).expect("Failed to create custom out directory");
+
+        /* let cargo_out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+        // Cargo'nun OUT_DIR'inden kendi dizininize sembolik bağlantılar oluşturun
+        for entry in std::fs::read_dir(cargo_out_dir).expect("Failed to read OUT_DIR") {
+            let entry = entry.expect("Failed to read directory entry");
+            let target_path = custom_out_dir.join(entry.file_name());
+            if !target_path.exists() {
+                fs::symlink(entry.path(), target_path).expect("Failed to create symlink");
+            }
+        } */
+
+        let out_dir = custom_out_dir.clone();// PathBuf::from(env::var("OUT_DIR").unwrap());
+        let project_dir = custom_out_dir.clone(); // PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let third_party_dir = project_dir.join("third_party");
 
         let (leptonica_dir, tesseract_dir) = if third_party_dir.exists() {
