@@ -29,9 +29,16 @@ mod build_tesseract {
             )
         };
 
+        let (cmake_cxx_flags, additional_defines) = get_os_specific_config();
+
         // Build Leptonica
         let leptonica_install_dir = out_dir.join("leptonica");
-        let leptonica = Config::new(&leptonica_dir)
+        let mut leptonica_config = Config::new(&leptonica_dir);
+        if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+            leptonica_config.env("CC", "sccache cc")
+                  .env("CXX", "sccache c++");
+        }
+        leptonica_config
             .define("BUILD_PROG", "OFF")
             .define("BUILD_SHARED_LIBS", "OFF")
             .define("ENABLE_ZLIB", "OFF")
@@ -41,8 +48,15 @@ mod build_tesseract {
             .define("ENABLE_WEBP", "OFF")
             .define("ENABLE_OPENJPEG", "OFF")
             .define("ENABLE_GIF", "OFF")
-            .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir)
-            .build();
+            .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
+            .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
+            
+
+        for (key, value) in &additional_defines {
+            leptonica_config.define(key, value);
+        }
+
+        let leptonica = leptonica_config.build();
 
         let leptonica_include_dir = leptonica_install_dir.join("include");
         let leptonica_lib_dir = leptonica_install_dir.join("lib");
@@ -50,7 +64,12 @@ mod build_tesseract {
         // Build Tesseract
         let tesseract_install_dir = out_dir.join("tesseract");
         let tessdata_prefix = project_dir.join("tessdata");
-        let tesseract = Config::new(&tesseract_dir)
+        let mut tesseract_config = Config::new(&tesseract_dir);
+        if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+            tesseract_config.env("CC", "sccache cc")
+                  .env("CXX", "sccache c++");
+        }
+        tesseract_config
             .define("BUILD_TRAINING_TOOLS", "OFF")
             .define("BUILD_SHARED_LIBS", "OFF")
             .define("DISABLE_ARCHIVE", "ON")
@@ -62,7 +81,13 @@ mod build_tesseract {
             .define("CMAKE_PREFIX_PATH", &leptonica_install_dir)
             .define("CMAKE_INSTALL_PREFIX", &tesseract_install_dir)
             .define("TESSDATA_PREFIX", &tessdata_prefix)
-            .build();
+            .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
+
+        for (key, value) in &additional_defines {
+            tesseract_config.define(key, value);
+        }
+
+        let tesseract = tesseract_config.build();
 
         println!("cargo:rerun-if-changed=build.rs");
         println!("cargo:rerun-if-changed={}", third_party_dir.display());
@@ -74,7 +99,7 @@ mod build_tesseract {
         println!("cargo:rustc-link-lib=static=leptonica");
         println!("cargo:rustc-link-lib=static=tesseract");
 
-        println!("cargo:rustc-link-lib=stdc++");
+        set_os_specific_link_flags();
 
         println!("cargo:warning=Leptonica include dir: {:?}", leptonica_include_dir);
         println!("cargo:warning=Leptonica lib dir: {:?}", leptonica_lib_dir);
@@ -82,6 +107,60 @@ mod build_tesseract {
         println!("cargo:warning=Tessdata dir: {:?}", tessdata_prefix);
 
         download_tessdata(&project_dir);
+    }
+
+    fn get_os_specific_config() -> (String, Vec<(String, String)>) {
+        let mut cmake_cxx_flags = String::new();
+        let mut additional_defines = Vec::new();
+    
+        if cfg!(target_os = "macos") {
+            cmake_cxx_flags.push_str("-stdlib=libc++ ");
+            cmake_cxx_flags.push_str("-std=c++11 ");
+        } else if cfg!(target_os = "linux") {
+            cmake_cxx_flags.push_str("-std=c++11 ");
+            // Check if we're on a system using clang
+            if cfg!(target_env = "musl") || env::var("CC").map(|cc| cc.contains("clang")).unwrap_or(false) {
+                cmake_cxx_flags.push_str("-stdlib=libc++ ");
+                additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "clang++".to_string()));
+            } else {
+                // Assume GCC
+                additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "g++".to_string()));
+            }
+        } else if cfg!(target_os = "windows") {
+            // Windows-specific MSVC flags
+            cmake_cxx_flags.push_str("/EHsc /MP ");
+            additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD".to_string()));
+            additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd".to_string()));
+        }
+    
+        // Common flags and defines for all platforms
+        cmake_cxx_flags.push_str("-DUSE_STD_NAMESPACE ");
+        additional_defines.push(("CMAKE_POSITION_INDEPENDENT_CODE".to_string(), "ON".to_string()));
+    
+        (cmake_cxx_flags, additional_defines)
+    }
+
+    fn set_os_specific_link_flags() {
+        if cfg!(target_os = "macos") {
+            println!("cargo:rustc-link-lib=c++");
+        } else if cfg!(target_os = "linux") {
+            if cfg!(target_env = "musl") || env::var("CC").map(|cc| cc.contains("clang")).unwrap_or(false) {
+                println!("cargo:rustc-link-lib=c++");
+            } else {
+                println!("cargo:rustc-link-lib=stdc++");
+            }
+            println!("cargo:rustc-link-lib=pthread");
+            println!("cargo:rustc-link-lib=m");
+            println!("cargo:rustc-link-lib=dl");
+        } else if cfg!(target_os = "windows") {
+            // Additional linker flags are generally not required for Windows,
+            // as MSVC automatically links the necessary libraries.
+            // However, for some special cases, additions can be made as follows:
+            // println!("cargo:rustc-link-lib=user32");
+            // println!("cargo:rustc-link-lib=gdi32");
+        }
+    
+        println!("cargo:rustc-link-search=native={}", env::var("OUT_DIR").unwrap());
     }
 
     fn download_and_extract(target_dir: &Path, url: &str, name: &str) -> PathBuf {
