@@ -64,6 +64,11 @@ mod build_tesseract {
             .define("TESSDATA_PREFIX", &tessdata_prefix)
             .build();
 
+        println!("cargo:rerun-if-changed=build.rs");
+        println!("cargo:rerun-if-changed={}", third_party_dir.display());
+        println!("cargo:rerun-if-changed={}", leptonica_dir.display());
+        println!("cargo:rerun-if-changed={}", tesseract_dir.display());
+
         println!("cargo:rustc-link-search=native={}", leptonica_lib_dir.display());
         println!("cargo:rustc-link-search=native={}", tesseract_install_dir.join("lib").display());
         println!("cargo:rustc-link-lib=static=leptonica");
