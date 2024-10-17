@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use image::{DynamicImage, ImageBuffer, Luma};
-use tess_rs::TesseractAPI;
+use tesseract_rs::TesseractAPI;
 use imageproc::contrast::adaptive_threshold;
 use imageproc::filter::filter3x3;
 
@@ -33,7 +33,6 @@ fn load_test_image(filename: &str) -> Result<(Vec<u8>, u32, u32), Box<dyn std::e
 fn test_multiple_languages_with_lstm() {
     let tessdata_dir_str = std::env::var("TESSDATA_PREFIX").expect("TESSDATA_PREFIX not set");
     let tessdata_dir = Path::new(tessdata_dir_str.as_str());
-    std::env::set_var("", tessdata_dir);
 
     let eng_traineddata = tessdata_dir.join("eng.traineddata");
     let tur_traineddata = tessdata_dir.join("tur.traineddata");
@@ -41,11 +40,12 @@ fn test_multiple_languages_with_lstm() {
     assert!(tur_traineddata.exists(), "tur.traineddata not found");
 
     let api = TesseractAPI::new();
+    let _ = api.set_variable("debug_file", "/dev/null");
 
-    api.init(tessdata_dir.to_str().unwrap(), "eng+tur")
+    api.init(tessdata_dir.to_str().unwrap(), "tur")
         .expect("Failed to initialize Tesseract with multiple languages");
 
-    api.set_variable("tessedit_ocr_engine_mode", "1")
+    api.set_variable("tessedit_ocr_engine_mode", "4")
         .expect("Failed to set LSTM mode");
 
     api.set_variable("tessedit_pageseg_mode", "1")

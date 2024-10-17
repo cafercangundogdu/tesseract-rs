@@ -71,7 +71,9 @@ mod build_tesseract {
                 .define("ENABLE_WEBP", "OFF")
                 .define("ENABLE_OPENJPEG", "OFF")
                 .define("ENABLE_GIF", "OFF")
+                .define("NO_CONSOLE_IO", "ON")
                 .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
+                .define("MINIMUM_SEVERITY", "L_SEVERITY_NONE")
                 .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
                 
 
@@ -113,6 +115,12 @@ mod build_tesseract {
                 .define("DISABLE_WEBP", "ON")
                 .define("DISABLE_OPENJPEG", "ON")
                 .define("DISABLE_ZLIB", "ON")
+                .define("DISABLE_LIBXML2", "ON")
+                .define("DISABLE_LIBICU", "ON")
+                .define("DISABLE_LZMA", "ON")
+                .define("DISABLE_GIF", "ON")
+                .define("DISABLE_DEBUG_MESSAGES", "ON")
+                .define("debug_file", "/dev/null")
                 .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
 
             for (key, value) in &additional_defines {
