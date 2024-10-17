@@ -10,100 +10,117 @@ mod build_tesseract {
 
     pub fn build() {
         let home_dir = env::var("HOME").expect("HOME environment variable not set");
-        let custom_out_dir = PathBuf::from(home_dir).join(".tesseract-rs"); //.join("third_party");
+        let custom_out_dir = if cfg!(target_os = "macos") {
+            PathBuf::from(home_dir).join("Library").join("Application Support").join("tesseract-rs")
+        } else if cfg!(target_os = "linux") {
+            PathBuf::from(home_dir).join(".tesseract-rs")
+        } else if cfg!(target_os = "windows") {
+            PathBuf::from(env::var("APPDATA").expect("APPDATA environment variable not set")).join("tesseract-rs")
+        } else {
+            panic!("Unsupported operating system");
+        };
         std::fs::create_dir_all(&custom_out_dir).expect("Failed to create custom out directory");
 
-        /* let cargo_out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        println!("cargo:warning=custom_out_dir: {:?}", custom_out_dir);
 
-        // Cargo'nun OUT_DIR'inden kendi dizininize sembolik bağlantılar oluşturun
-        for entry in std::fs::read_dir(cargo_out_dir).expect("Failed to read OUT_DIR") {
-            let entry = entry.expect("Failed to read directory entry");
-            let target_path = custom_out_dir.join(entry.file_name());
-            if !target_path.exists() {
-                fs::symlink(entry.path(), target_path).expect("Failed to create symlink");
-            }
-        } */
+        let cache_dir = custom_out_dir.join("cache");
 
-        let out_dir = custom_out_dir.clone();// PathBuf::from(env::var("OUT_DIR").unwrap());
-        let project_dir = custom_out_dir.clone(); // PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        if env::var("CARGO_CLEAN").is_ok() {
+            clean_cache(&cache_dir);
+        }
+
+        std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+
+        let out_dir = custom_out_dir.clone();
+        let project_dir = custom_out_dir.clone();
         let third_party_dir = project_dir.join("third_party");
 
-        let (leptonica_dir, tesseract_dir) = if third_party_dir.exists() {
-            // Submodule scenario
-            (
-                third_party_dir.join("leptonica"),
-                third_party_dir.join("tesseract"),
-            )
+        let leptonica_dir = if third_party_dir.join("leptonica").exists() {
+            third_party_dir.join("leptonica")
         } else {
-            // Download scenario
             fs::create_dir_all(&third_party_dir).expect("Failed to create third_party directory");
-            (
-                download_and_extract(&third_party_dir, LEPTONICA_URL, "leptonica"),
-                download_and_extract(&third_party_dir, TESSERACT_URL, "tesseract"),
-            )
+            download_and_extract(&third_party_dir, LEPTONICA_URL, "leptonica")
+        };
+
+        let tesseract_dir = if third_party_dir.join("tesseract").exists() {
+            third_party_dir.join("tesseract")
+        } else {
+            fs::create_dir_all(&third_party_dir).expect("Failed to create third_party directory");
+            download_and_extract(&third_party_dir, TESSERACT_URL, "tesseract")
         };
 
         let (cmake_cxx_flags, additional_defines) = get_os_specific_config();
 
-        // Build Leptonica
         let leptonica_install_dir = out_dir.join("leptonica");
-        let mut leptonica_config = Config::new(&leptonica_dir);
-        if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
-            leptonica_config.env("CC", "sccache cc")
-                  .env("CXX", "sccache c++");
-        }
-        leptonica_config
-            .define("CMAKE_BUILD_TYPE", "Release")
-            .define("BUILD_PROG", "OFF")
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .define("ENABLE_ZLIB", "OFF")
-            .define("ENABLE_PNG", "OFF")
-            .define("ENABLE_JPEG", "OFF")
-            .define("ENABLE_TIFF", "OFF")
-            .define("ENABLE_WEBP", "OFF")
-            .define("ENABLE_OPENJPEG", "OFF")
-            .define("ENABLE_GIF", "OFF")
-            .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
-            .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
-            
+        let leptonica_cache_dir = cache_dir.join("leptonica");
 
-        for (key, value) in &additional_defines {
-            leptonica_config.define(key, value);
-        }
+        build_or_use_cached("leptonica", &leptonica_cache_dir, &leptonica_install_dir, || {
+            let mut leptonica_config = Config::new(&leptonica_dir);
+            if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                leptonica_config.env("CC", "sccache cc")
+                    .env("CXX", "sccache c++");
+            }
+            leptonica_config
+                .define("CMAKE_BUILD_TYPE", "Release")
+                .define("BUILD_PROG", "OFF")
+                .define("BUILD_SHARED_LIBS", "OFF")
+                .define("ENABLE_ZLIB", "OFF")
+                .define("ENABLE_PNG", "OFF")
+                .define("ENABLE_JPEG", "OFF")
+                .define("ENABLE_TIFF", "OFF")
+                .define("ENABLE_WEBP", "OFF")
+                .define("ENABLE_OPENJPEG", "OFF")
+                .define("ENABLE_GIF", "OFF")
+                .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
+                .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
+                
 
-        let leptonica = leptonica_config.build();
+            for (key, value) in &additional_defines {
+                leptonica_config.define(key, value);
+            }
 
+            leptonica_config.build();
+        });
+    
         let leptonica_include_dir = leptonica_install_dir.join("include");
         let leptonica_lib_dir = leptonica_install_dir.join("lib");
-
-        // Build Tesseract
         let tesseract_install_dir = out_dir.join("tesseract");
+        let tesseract_cache_dir = cache_dir.join("tesseract");
         let tessdata_prefix = project_dir.join("tessdata");
-        let mut tesseract_config = Config::new(&tesseract_dir);
-        if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
-            tesseract_config.env("CC", "sccache cc")
-                  .env("CXX", "sccache c++");
-        }
-        tesseract_config
-            .define("CMAKE_BUILD_TYPE", "Release")
-            .define("BUILD_TRAINING_TOOLS", "OFF")
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .define("DISABLE_ARCHIVE", "ON")
-            .define("DISABLE_CURL", "ON")
-            .define("DISABLE_OPENCL", "ON")
-            .define("Leptonica_DIR", &leptonica_install_dir)
-            .define("LEPTONICA_INCLUDE_DIR", &leptonica_include_dir)
-            .define("LEPTONICA_LIBRARY", &leptonica_lib_dir)
-            .define("CMAKE_PREFIX_PATH", &leptonica_install_dir)
-            .define("CMAKE_INSTALL_PREFIX", &tesseract_install_dir)
-            .define("TESSDATA_PREFIX", &tessdata_prefix)
-            .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
 
-        for (key, value) in &additional_defines {
-            tesseract_config.define(key, value);
-        }
+        build_or_use_cached("tesseract", &tesseract_cache_dir, &tesseract_install_dir, || {
+            let mut tesseract_config = Config::new(&tesseract_dir);
+            if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                tesseract_config.env("CC", "sccache cc")
+                    .env("CXX", "sccache c++");
+            }
+            tesseract_config
+                .define("CMAKE_BUILD_TYPE", "Release")
+                .define("BUILD_TRAINING_TOOLS", "OFF")
+                .define("BUILD_SHARED_LIBS", "OFF")
+                .define("DISABLE_ARCHIVE", "ON")
+                .define("DISABLE_CURL", "ON")
+                .define("DISABLE_OPENCL", "ON")
+                .define("Leptonica_DIR", &leptonica_install_dir)
+                .define("LEPTONICA_INCLUDE_DIR", &leptonica_include_dir)
+                .define("LEPTONICA_LIBRARY", &leptonica_lib_dir)
+                .define("CMAKE_PREFIX_PATH", &leptonica_install_dir)
+                .define("CMAKE_INSTALL_PREFIX", &tesseract_install_dir)
+                .define("TESSDATA_PREFIX", &tessdata_prefix)
+                .define("DISABLE_TIFF", "ON")
+                .define("DISABLE_PNG", "ON")
+                .define("DISABLE_JPEG", "ON")
+                .define("DISABLE_WEBP", "ON")
+                .define("DISABLE_OPENJPEG", "ON")
+                .define("DISABLE_ZLIB", "ON")
+                .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
 
-        let tesseract = tesseract_config.build();
+            for (key, value) in &additional_defines {
+                tesseract_config.define(key, value);
+            }
+
+            tesseract_config.build();
+        });
 
         println!("cargo:rerun-if-changed=build.rs");
         println!("cargo:rerun-if-changed={}", third_party_dir.display());
@@ -182,7 +199,8 @@ mod build_tesseract {
     fn download_and_extract(target_dir: &Path, url: &str, name: &str) -> PathBuf {
         use reqwest::blocking::Client;
         use zip::ZipArchive;
-        use std::io::Read;
+
+        fs::create_dir_all(target_dir).expect("Failed to create target directory");
     
         let client = Client::new();
         let mut response = client.get(url).send().expect("Failed to download archive");
@@ -255,6 +273,36 @@ mod build_tesseract {
                 println!("cargo:warning={} already exists, skipping download", filename);
             }
         }
+    }
+
+    fn clean_cache(cache_dir: &Path) {
+        println!("Cleaning cache directory: {:?}", cache_dir);
+        if cache_dir.exists() {
+            fs::remove_dir_all(cache_dir).expect("Failed to remove cache directory");
+        }
+    }
+
+    fn build_or_use_cached<F>(name: &str, cache_dir: &Path, install_dir: &Path, build_fn: F)
+    where
+        F: FnOnce(),
+    {
+        let lib_name = format!("lib{}.a", name);
+        let cached_path = cache_dir.join(&lib_name);
+        let out_path = install_dir.join("lib").join(&lib_name);
+
+        if cached_path.exists() {
+            println!("Using cached {} library", name);
+            fs::create_dir_all(out_path.parent().unwrap()).expect("Failed to create output directory");
+            fs::copy(&cached_path, &out_path).expect("Failed to copy cached library");
+        } else {
+            println!("Building {} library", name);
+            build_fn();
+            fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
+            fs::copy(&out_path, &cached_path).expect("Failed to cache library");
+        }
+
+        println!("cargo:rustc-link-search=native={}", install_dir.join("lib").display());
+        println!("cargo:rustc-link-lib=static={}", name);
     }
 }
 
