@@ -15,7 +15,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.1.7", features = ["build-tesseract"] }
+tesseract-rs = { version = "0.1.8", features = ["build-tesseract"] }
 ```
 
 ## System Requirements
