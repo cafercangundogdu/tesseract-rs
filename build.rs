@@ -74,8 +74,10 @@ mod build_tesseract {
                 .define("NO_CONSOLE_IO", "ON")
                 .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
                 .define("MINIMUM_SEVERITY", "L_SEVERITY_NONE")
+                .define("SW_BUILD", "OFF")
+                .define("HAVE_LIBZ", "0")
+                .define("ENABLE_LTO", "OFF")
                 .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
-                
 
             for (key, value) in &additional_defines {
                 leptonica_config.define(key, value);
@@ -121,6 +123,20 @@ mod build_tesseract {
                 .define("DISABLE_GIF", "ON")
                 .define("DISABLE_DEBUG_MESSAGES", "ON")
                 .define("debug_file", "/dev/null")
+                .define("HAVE_LIBARCHIVE", "OFF")
+                .define("HAVE_LIBCURL", "OFF")
+                .define("HAVE_TIFFIO_H", "OFF")
+                .define("GRAPHICS_DISABLED", "ON")
+                .define("DISABLED_LEGACY_ENGINE", "ON")
+                .define("USE_OPENCL", "OFF")
+                .define("OPENMP_BUILD", "OFF")
+                .define("BUILD_TESTS", "OFF")
+                .define("ENABLE_LTO", "OFF")
+                .define("BUILD_PROG", "OFF")
+                .define("SW_BUILD", "OFF")
+                .define("LEPT_TIFF_RESULT", "FALSE")
+                .define("INSTALL_CONFIGS", "ON")
+                .define("USE_SYSTEM_ICU", "ON")
                 .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
 
             for (key, value) in &additional_defines {
