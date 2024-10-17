@@ -56,6 +56,31 @@ mod build_tesseract {
 
         build_or_use_cached("leptonica", &leptonica_cache_dir, &leptonica_install_dir, || {
             let mut leptonica_config = Config::new(&leptonica_dir);
+
+            let leptonica_src_dir = leptonica_dir.join("src");
+            let environ_h_path = leptonica_src_dir.join("environ.h");
+            let environ_h = std::fs::read_to_string(&environ_h_path)
+                .expect("Failed to read environ.h")
+                .replace(
+                    "#define  HAVE_LIBZ          1",
+                    "#define  HAVE_LIBZ          0",
+                )
+                .replace(
+                    "#ifdef  NO_CONSOLE_IO",
+                    "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO",
+                );
+            std::fs::write(environ_h_path, environ_h).expect("Failed to write environ.h");
+
+            let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
+            let makefile_static = std::fs::read_to_string(&makefile_static_path)
+                .expect("Failed to read makefile.static")
+                .replace(
+                    "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
+                    "ALL_LIBS =	$(LEPTLIB) -lm",
+                );
+            std::fs::write(makefile_static_path, makefile_static).expect("Failed to write makefile.static");
+
+            
             if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
                 leptonica_config.env("CC", "sccache cc")
                     .env("CXX", "sccache c++");
@@ -93,6 +118,13 @@ mod build_tesseract {
         let tessdata_prefix = project_dir.join("tessdata");
 
         build_or_use_cached("tesseract", &tesseract_cache_dir, &tesseract_install_dir, || {
+            let cmakelists_path = tesseract_dir.join("CMakeLists.txt");
+            let cmakelists = std::fs::read_to_string(&cmakelists_path)
+                .expect("Failed to read CMakeLists.txt")
+                .replace("set(HAVE_TIFFIO_H ON)", "");
+            std::fs::write(&cmakelists_path, cmakelists).expect("Failed to write CMakeLists.txt");
+    
+            
             let mut tesseract_config = Config::new(&tesseract_dir);
             if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
                 tesseract_config.env("CC", "sccache cc")
