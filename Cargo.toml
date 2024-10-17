@@ -19,11 +19,11 @@ exclude = [
 ]
 
 [dependencies]
-libc = "0.2.159"
+libc = "0.2.161"
 thiserror = "1.0.64"
 
 [dev-dependencies]
-image = "0.25.2"
+image = "0.25.4"
 imageproc = "0.25.0"
 
 [build-dependencies]
