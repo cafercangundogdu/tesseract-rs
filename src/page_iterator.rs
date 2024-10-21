@@ -1,7 +1,9 @@
+use crate::api::TessDeleteText;
 use crate::enums::{
     TessOrientation, TessPageIteratorLevel, TessParagraphJustification, TessPolyBlockType,
     TessTextlineOrder, TessWritingDirection,
 };
+use crate::result_iterator::{TessResultIteratorConfidence, TessResultIteratorGetUTF8Text};
 use crate::TesseractError;
 use std::os::raw::{c_float, c_int, c_void};
 
@@ -214,6 +216,22 @@ impl PageIterator {
                 first_line_indent,
             ))
         }
+    }
+
+    pub fn get_utf8_text(&self, level: TessPageIteratorLevel) -> Result<String, TesseractError> {
+        let text = unsafe { TessResultIteratorGetUTF8Text(self.handle, level as c_int) };
+        if text.is_null() {
+            Err(TesseractError::InvalidParameterError)
+        } else {
+            let result = unsafe { std::ffi::CStr::from_ptr(text).to_string_lossy().to_string() };
+            unsafe { TessDeleteText(text) };
+            Ok(result)
+        }
+    }
+
+    pub fn confidence(&self, level: TessPageIteratorLevel) -> Result<f32, TesseractError> {
+        let confidence = unsafe { TessResultIteratorConfidence(self.handle, level as c_int) };
+        Ok(confidence)
     }
 }
 
