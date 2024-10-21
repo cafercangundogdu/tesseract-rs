@@ -6,9 +6,11 @@ use crate::enums::{
 use crate::result_iterator::{TessResultIteratorConfidence, TessResultIteratorGetUTF8Text};
 use crate::TesseractError;
 use std::os::raw::{c_float, c_int, c_void};
+use std::sync::Arc;
+use std::sync::Mutex;
 
 pub struct PageIterator {
-    handle: *mut c_void,
+    handle: Arc<Mutex<*mut c_void>>,
 }
 
 impl PageIterator {
@@ -22,12 +24,15 @@ impl PageIterator {
     ///
     /// Returns the new instance of the PageIterator.
     pub(crate) fn new(handle: *mut c_void) -> Self {
-        PageIterator { handle }
+        PageIterator {
+            handle: Arc::new(Mutex::new(handle)),
+        }
     }
 
     /// Begins the iteration.
     pub fn begin(&self) {
-        unsafe { TessPageIteratorBegin(self.handle) };
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessPageIteratorBegin(*handle) };
     }
 
     /// Gets the next iterator.
@@ -40,7 +45,8 @@ impl PageIterator {
     ///
     /// Returns `true` if the next iterator is successful, otherwise returns `false`.
     pub fn next(&self, level: TessPageIteratorLevel) -> bool {
-        unsafe { TessPageIteratorNext(self.handle, level as c_int) != 0 }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessPageIteratorNext(*handle, level as c_int) != 0 }
     }
 
     /// Checks if the current iterator is at the beginning of the specified level.
@@ -53,7 +59,8 @@ impl PageIterator {
     ///
     /// Returns `true` if the current iterator is at the beginning of the specified level, otherwise returns `false`.
     pub fn is_at_beginning_of(&self, level: TessPageIteratorLevel) -> bool {
-        unsafe { TessPageIteratorIsAtBeginningOf(self.handle, level as c_int) != 0 }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessPageIteratorIsAtBeginningOf(*handle, level as c_int) != 0 }
     }
 
     /// Checks if the current iterator is at the final element of the specified level.
@@ -71,9 +78,8 @@ impl PageIterator {
         level: TessPageIteratorLevel,
         element: TessPageIteratorLevel,
     ) -> bool {
-        unsafe {
-            TessPageIteratorIsAtFinalElement(self.handle, level as c_int, element as c_int) != 0
-        }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessPageIteratorIsAtFinalElement(*handle, level as c_int, element as c_int) != 0 }
     }
 
     /// Gets the bounding box of the current iterator.
@@ -93,9 +99,10 @@ impl PageIterator {
         let mut top = 0;
         let mut right = 0;
         let mut bottom = 0;
+        let handle = self.handle.lock().unwrap();
         let result = unsafe {
             TessPageIteratorBoundingBox(
-                self.handle,
+                *handle,
                 level as c_int,
                 &mut left,
                 &mut top,
@@ -116,7 +123,8 @@ impl PageIterator {
     ///
     /// Returns the block type as a `TessPolyBlockType`.
     pub fn block_type(&self) -> TessPolyBlockType {
-        let block_type = unsafe { TessPageIteratorBlockType(self.handle) };
+        let handle = self.handle.lock().unwrap();
+        let block_type = unsafe { TessPageIteratorBlockType(*handle) };
         unsafe { std::mem::transmute(block_type) }
     }
 
@@ -134,9 +142,9 @@ impl PageIterator {
         let mut y1 = 0;
         let mut x2 = 0;
         let mut y2 = 0;
-        let result = unsafe {
-            TessPageIteratorBaseline(self.handle, level, &mut x1, &mut y1, &mut x2, &mut y2)
-        };
+        let handle = self.handle.lock().unwrap();
+        let result =
+            unsafe { TessPageIteratorBaseline(*handle, level, &mut x1, &mut y1, &mut x2, &mut y2) };
         if result == 0 {
             Err(TesseractError::InvalidParameterError)
         } else {
@@ -164,9 +172,10 @@ impl PageIterator {
         let mut writing_direction = 0;
         let mut textline_order = 0;
         let mut deskew_angle = 0.0;
+        let handle = self.handle.lock().unwrap();
         let result = unsafe {
             TessPageIteratorOrientation(
-                self.handle,
+                *handle,
                 &mut orientation,
                 &mut writing_direction,
                 &mut textline_order,
@@ -197,9 +206,10 @@ impl PageIterator {
         let mut is_list_item = false;
         let mut is_crown = false;
         let mut first_line_indent = 0;
+        let handle = self.handle.lock().unwrap();
         let result = unsafe {
             TessPageIteratorParagraphInfo(
-                self.handle,
+                *handle,
                 &mut justification,
                 &mut is_list_item,
                 &mut is_crown,
@@ -219,7 +229,8 @@ impl PageIterator {
     }
 
     pub fn get_utf8_text(&self, level: TessPageIteratorLevel) -> Result<String, TesseractError> {
-        let text = unsafe { TessResultIteratorGetUTF8Text(self.handle, level as c_int) };
+        let handle = self.handle.lock().unwrap();
+        let text = unsafe { TessResultIteratorGetUTF8Text(*handle, level as c_int) };
         if text.is_null() {
             Err(TesseractError::InvalidParameterError)
         } else {
@@ -230,14 +241,16 @@ impl PageIterator {
     }
 
     pub fn confidence(&self, level: TessPageIteratorLevel) -> Result<f32, TesseractError> {
-        let confidence = unsafe { TessResultIteratorConfidence(self.handle, level as c_int) };
+        let handle = self.handle.lock().unwrap();
+        let confidence = unsafe { TessResultIteratorConfidence(*handle, level as c_int) };
         Ok(confidence)
     }
 }
 
 impl Drop for PageIterator {
     fn drop(&mut self) {
-        unsafe { TessPageIteratorDelete(self.handle) };
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessPageIteratorDelete(*handle) };
     }
 }
 

@@ -28,6 +28,8 @@ pub enum TesseractError {
     ProcessPagesError,
     #[error("G/Ç hatası")]
     IoError,
+    #[error("Mutex hatası")]
+    MutexError,
 }
 
 /// Tesseract işlemleri için sonuç türü.

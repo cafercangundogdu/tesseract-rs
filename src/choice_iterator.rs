@@ -2,9 +2,10 @@ use crate::api::TessDeleteText;
 use crate::error::{Result, TesseractError};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_float, c_int, c_void};
+use std::sync::{Arc, Mutex};
 
 pub struct ChoiceIterator {
-    handle: *mut c_void,
+    handle: Arc<Mutex<*mut c_void>>,
 }
 
 impl ChoiceIterator {
@@ -14,7 +15,9 @@ impl ChoiceIterator {
     ///
     /// * `handle` - Pointer to the ChoiceIterator.
     pub fn new(handle: *mut c_void) -> Self {
-        ChoiceIterator { handle }
+        ChoiceIterator {
+            handle: Arc::new(Mutex::new(handle)),
+        }
     }
 
     /// Gets the next choice.
@@ -22,8 +25,12 @@ impl ChoiceIterator {
     /// # Returns
     ///
     /// Returns `true` if the next choice is successful, otherwise returns `false`.
-    pub fn next(&self) -> bool {
-        unsafe { TessChoiceIteratorNext(self.handle) != 0 }
+    pub fn next(&self) -> Result<bool> {
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        Ok(unsafe { TessChoiceIteratorNext(*handle) != 0 })
     }
 
     /// Gets the UTF-8 text for the current choice.
@@ -32,7 +39,11 @@ impl ChoiceIterator {
     ///
     /// Returns the UTF-8 text as a `String` if successful, otherwise returns an error.
     pub fn get_utf8_text(&self) -> Result<String> {
-        let text_ptr = unsafe { TessChoiceIteratorGetUTF8Text(self.handle) };
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        let text_ptr = unsafe { TessChoiceIteratorGetUTF8Text(*handle) };
         if text_ptr.is_null() {
             return Err(TesseractError::NullPointerError);
         }
@@ -47,14 +58,20 @@ impl ChoiceIterator {
     /// # Returns
     ///
     /// Returns the confidence as a `f32`.
-    pub fn confidence(&self) -> f32 {
-        unsafe { TessChoiceIteratorConfidence(self.handle) }
+    pub fn confidence(&self) -> Result<f32> {
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        Ok(unsafe { TessChoiceIteratorConfidence(*handle) })
     }
 }
 
 impl Drop for ChoiceIterator {
     fn drop(&mut self) {
-        unsafe { TessChoiceIteratorDelete(self.handle) };
+        if let Ok(handle) = self.handle.lock() {
+            unsafe { TessChoiceIteratorDelete(*handle) };
+        }
     }
 }
 

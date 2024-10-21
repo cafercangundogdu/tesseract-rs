@@ -2,9 +2,11 @@ use crate::error::{Result, TesseractError};
 use crate::TesseractAPI;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
+use std::sync::Arc;
+use std::sync::Mutex;
 
 pub struct TessResultRenderer {
-    handle: *mut c_void,
+    handle: Arc<Mutex<*mut c_void>>,
 }
 
 impl TessResultRenderer {
@@ -23,7 +25,9 @@ impl TessResultRenderer {
         if handle.is_null() {
             Err(TesseractError::NullPointerError)
         } else {
-            Ok(TessResultRenderer { handle })
+            Ok(TessResultRenderer {
+                handle: Arc::new(Mutex::new(handle)),
+            })
         }
     }
 
@@ -42,7 +46,9 @@ impl TessResultRenderer {
         if handle.is_null() {
             Err(TesseractError::NullPointerError)
         } else {
-            Ok(TessResultRenderer { handle })
+            Ok(TessResultRenderer {
+                handle: Arc::new(Mutex::new(handle)),
+            })
         }
     }
 
@@ -66,7 +72,9 @@ impl TessResultRenderer {
         if handle.is_null() {
             Err(TesseractError::NullPointerError)
         } else {
-            Ok(TessResultRenderer { handle })
+            Ok(TessResultRenderer {
+                handle: Arc::new(Mutex::new(handle)),
+            })
         }
     }
 
@@ -81,7 +89,8 @@ impl TessResultRenderer {
     /// Returns `true` if the document was created successfully, otherwise returns `false`.
     pub fn begin_document(&self, title: &str) -> bool {
         let title = CString::new(title).unwrap();
-        unsafe { TessResultRendererBeginDocument(self.handle, title.as_ptr()) != 0 }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessResultRendererBeginDocument(*handle, title.as_ptr()) != 0 }
     }
 
     /// Adds an image to the document.
@@ -95,7 +104,8 @@ impl TessResultRenderer {
     /// Returns `true` if the image was added successfully, otherwise returns `false`.
     pub fn add_image(&self, api: &TesseractAPI) -> bool {
         let api_handle = api.handle.lock().unwrap();
-        unsafe { TessResultRendererAddImage(self.handle, *api_handle) != 0 }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessResultRendererAddImage(*handle, *api_handle) != 0 }
     }
 
     /// Ends the document.
@@ -104,7 +114,8 @@ impl TessResultRenderer {
     ///
     /// Returns `true` if the document was ended successfully, otherwise returns `false`.
     pub fn end_document(&self) -> bool {
-        unsafe { TessResultRendererEndDocument(self.handle) != 0 }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessResultRendererEndDocument(*handle) != 0 }
     }
 
     /// Gets the extension of the document.
@@ -113,7 +124,8 @@ impl TessResultRenderer {
     ///
     /// Returns the extension as a `String` if successful, otherwise returns an error.
     pub fn get_extension(&self) -> Result<String> {
-        let ext_ptr = unsafe { TessResultRendererExtention(self.handle) };
+        let handle = self.handle.lock().unwrap();
+        let ext_ptr = unsafe { TessResultRendererExtention(*handle) };
         if ext_ptr.is_null() {
             Err(TesseractError::NullPointerError)
         } else {
@@ -128,7 +140,8 @@ impl TessResultRenderer {
     ///
     /// Returns the title as a `String` if successful, otherwise returns an error.
     pub fn get_title(&self) -> Result<String> {
-        let title_ptr = unsafe { TessResultRendererTitle(self.handle) };
+        let handle = self.handle.lock().unwrap();
+        let title_ptr = unsafe { TessResultRendererTitle(*handle) };
         if title_ptr.is_null() {
             Err(TesseractError::NullPointerError)
         } else {
@@ -143,13 +156,15 @@ impl TessResultRenderer {
     ///
     /// Returns the number of images as an `i32`.
     pub fn get_image_num(&self) -> i32 {
-        unsafe { TessResultRendererImageNum(self.handle) }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessResultRendererImageNum(*handle) }
     }
 }
 
 impl Drop for TessResultRenderer {
     fn drop(&mut self) {
-        unsafe { TessDeleteResultRenderer(self.handle) };
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessDeleteResultRenderer(*handle) };
     }
 }
 

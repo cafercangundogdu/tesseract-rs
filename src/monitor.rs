@@ -1,7 +1,8 @@
 use std::os::raw::{c_int, c_void};
+use std::sync::{Arc, Mutex};
 
 pub struct TessMonitor {
-    handle: *mut c_void,
+    handle: Arc<Mutex<*mut c_void>>,
 }
 
 impl TessMonitor {
@@ -12,7 +13,9 @@ impl TessMonitor {
     /// Returns the new instance of the TessMonitor.
     pub fn new() -> Self {
         let handle = unsafe { TessMonitorCreate() };
-        TessMonitor { handle }
+        TessMonitor {
+            handle: Arc::new(Mutex::new(handle)),
+        }
     }
 
     /// Sets the deadline for the monitor.
@@ -20,8 +23,9 @@ impl TessMonitor {
     /// # Arguments
     ///
     /// * `deadline` - Deadline in milliseconds.
-    pub fn set_deadline(&mut self, deadline: i32) {
-        unsafe { TessMonitorSetDeadlineMSecs(self.handle, deadline) };
+    pub fn set_deadline(&self, deadline: i32) {
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessMonitorSetDeadlineMSecs(*handle, deadline) };
     }
 
     /// Gets the progress of the monitor.
@@ -30,13 +34,15 @@ impl TessMonitor {
     ///
     /// Returns the progress as an `i32`.
     pub fn get_progress(&self) -> i32 {
-        unsafe { TessMonitorGetProgress(self.handle) }
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessMonitorGetProgress(*handle) }
     }
 }
 
 impl Drop for TessMonitor {
     fn drop(&mut self) {
-        unsafe { TessMonitorDelete(self.handle) };
+        let handle = self.handle.lock().unwrap();
+        unsafe { TessMonitorDelete(*handle) };
     }
 }
 
