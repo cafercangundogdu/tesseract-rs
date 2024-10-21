@@ -8,6 +8,9 @@ pub struct ChoiceIterator {
     handle: Arc<Mutex<*mut c_void>>,
 }
 
+unsafe impl Send for ChoiceIterator {}
+unsafe impl Sync for ChoiceIterator {}
+
 impl ChoiceIterator {
     /// Creates a new instance of the ChoiceIterator.
     ///

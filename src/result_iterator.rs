@@ -9,6 +9,9 @@ pub struct ResultIterator {
     handle: Arc<Mutex<*mut c_void>>,
 }
 
+unsafe impl Send for ResultIterator {}
+unsafe impl Sync for ResultIterator {}
+
 impl ResultIterator {
     /// Creates a new instance of the ResultIterator.
     ///

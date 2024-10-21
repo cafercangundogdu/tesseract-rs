@@ -13,6 +13,9 @@ pub struct PageIterator {
     handle: Arc<Mutex<*mut c_void>>,
 }
 
+unsafe impl Send for PageIterator {}
+unsafe impl Sync for PageIterator {}
+
 impl PageIterator {
     /// Creates a new instance of the PageIterator.
     ///

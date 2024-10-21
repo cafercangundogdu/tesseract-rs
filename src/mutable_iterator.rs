@@ -16,6 +16,9 @@ pub struct MutableIterator {
     handle: Arc<Mutex<*mut c_void>>,
 }
 
+unsafe impl Send for MutableIterator {}
+unsafe impl Sync for MutableIterator {}
+
 impl MutableIterator {
     /// Creates a new instance of the MutableIterator.
     ///

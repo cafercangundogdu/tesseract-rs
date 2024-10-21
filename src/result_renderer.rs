@@ -9,6 +9,9 @@ pub struct TessResultRenderer {
     handle: Arc<Mutex<*mut c_void>>,
 }
 
+unsafe impl Send for TessResultRenderer {}
+unsafe impl Sync for TessResultRenderer {}
+
 impl TessResultRenderer {
     /// Creates a new instance of the TessResultRenderer.
     ///

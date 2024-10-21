@@ -5,6 +5,9 @@ pub struct TessMonitor {
     handle: Arc<Mutex<*mut c_void>>,
 }
 
+unsafe impl Send for TessMonitor {}
+unsafe impl Sync for TessMonitor {}
+
 impl TessMonitor {
     /// Creates a new instance of the TessMonitor.
     ///
