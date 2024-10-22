@@ -240,15 +240,20 @@ impl ResultIterator {
         self.next(TessPageIteratorLevel::RIL_WORD)
     }
 
-    /// Gets the bounding box for the current element.
-    ///
-    /// # Arguments
-    ///
-    /// * `level` - The page iterator level (word, line, paragraph etc.)
+    /// Gets the word information for the current position in the iterator.
+    /// Should be called before next() to ensure valid data.
     ///
     /// # Returns
-    ///
-    /// Returns a tuple of (left, top, right, bottom) coordinates if successful
+    /// Returns a tuple of (text, left, top, right, bottom, confidence) if successful
+    pub fn get_current_word(&self) -> Result<(String, i32, i32, i32, i32, f32)> {
+        let text = self.get_utf8_text(TessPageIteratorLevel::RIL_WORD)?;
+        let (left, top, right, bottom) = self.get_bounding_box(TessPageIteratorLevel::RIL_WORD)?;
+        let confidence = self.confidence(TessPageIteratorLevel::RIL_WORD)?;
+
+        Ok((text, left, top, right, bottom, confidence))
+    }
+
+    /// Gets the bounding box for the current element.
     pub fn get_bounding_box(&self, level: TessPageIteratorLevel) -> Result<(i32, i32, i32, i32)> {
         let mut left = 0;
         let mut top = 0;
