@@ -1,6 +1,7 @@
 use crate::enums::TessPageSegMode;
 use crate::error::{Result, TesseractError};
-use crate::page_iterator::TessBaseAPIGetIterator;
+use crate::page_iterator::{TessBaseAPIGetIterator, TessPageIteratorDelete};
+use crate::result_iterator::TessResultIteratorDelete;
 use crate::{PageIterator, ResultIterator};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_double, c_float, c_int, c_void};
@@ -1326,6 +1327,36 @@ impl TesseractAPI {
             return Err(TesseractError::NullPointerError);
         }
         Ok(PageIterator::new(iterator))
+    }
+
+    /// Gets both page and result iterators for full text analysis
+    pub fn get_iterators(&self) -> Result<(PageIterator, ResultIterator)> {
+        // Önce OCR işlemini gerçekleştir
+        self.recognize()?;
+
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+
+        // İki iterator'ı da al
+        let page_iter = unsafe { TessBaseAPIAnalyseLayout(*handle) };
+        let result_iter = unsafe { TessBaseAPIGetIterator(*handle) };
+
+        if page_iter.is_null() || result_iter.is_null() {
+            if !page_iter.is_null() {
+                unsafe { TessPageIteratorDelete(page_iter) };
+            }
+            if !result_iter.is_null() {
+                unsafe { TessResultIteratorDelete(result_iter) };
+            }
+            return Err(TesseractError::NullPointerError);
+        }
+
+        Ok((
+            PageIterator::new(page_iter),
+            ResultIterator::new(result_iter),
+        ))
     }
 }
 

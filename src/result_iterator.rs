@@ -6,7 +6,7 @@ use std::os::raw::{c_char, c_float, c_int, c_void};
 use std::sync::{Arc, Mutex};
 
 pub struct ResultIterator {
-    handle: Arc<Mutex<*mut c_void>>,
+    pub handle: Arc<Mutex<*mut c_void>>,
 }
 
 unsafe impl Send for ResultIterator {}

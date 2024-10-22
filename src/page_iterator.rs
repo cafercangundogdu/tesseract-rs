@@ -1,16 +1,14 @@
-use crate::api::TessDeleteText;
 use crate::enums::{
     TessOrientation, TessPageIteratorLevel, TessParagraphJustification, TessPolyBlockType,
     TessTextlineOrder, TessWritingDirection,
 };
 use crate::TesseractError;
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_float, c_int, c_void};
+use std::os::raw::{c_float, c_int, c_void};
 use std::sync::Arc;
 use std::sync::Mutex;
 
 pub struct PageIterator {
-    handle: Arc<Mutex<*mut c_void>>,
+    pub handle: Arc<Mutex<*mut c_void>>,
 }
 
 unsafe impl Send for PageIterator {}
@@ -230,31 +228,6 @@ impl PageIterator {
             ))
         }
     }
-
-    /// Gets the text for the current element
-    pub fn get_text(&self, level: TessPageIteratorLevel) -> Result<String, TesseractError> {
-        let handle = self
-            .handle
-            .lock()
-            .map_err(|_| TesseractError::MutexLockError)?;
-        let text_ptr = unsafe { TessPageIteratorGetUTF8Text(*handle, level as c_int) };
-        if text_ptr.is_null() {
-            return Err(TesseractError::NullPointerError);
-        }
-        let c_str = unsafe { CStr::from_ptr(text_ptr) };
-        let result = c_str.to_str()?.to_owned();
-        unsafe { TessDeleteText(text_ptr) };
-        Ok(result)
-    }
-
-    /// Gets the confidence for the current element
-    pub fn get_confidence(&self, level: TessPageIteratorLevel) -> Result<f32, TesseractError> {
-        let handle = self
-            .handle
-            .lock()
-            .map_err(|_| TesseractError::MutexLockError)?;
-        Ok(unsafe { TessPageIteratorConfidence(*handle, level as c_int) })
-    }
 }
 
 impl Drop for PageIterator {
@@ -307,7 +280,4 @@ extern "C" {
         is_crown: *mut bool,
         first_line_indent: *mut c_int,
     ) -> c_int;
-    pub fn TessPageIteratorGetUTF8Text(handle: *mut c_void, level: c_int) -> *mut c_char;
-    pub fn TessPageIteratorConfidence(handle: *mut c_void, level: c_int) -> c_float;
-
 }
