@@ -172,18 +172,18 @@ impl Drop for TessResultRenderer {
 }
 
 extern "C" {
-    fn TessTextRendererCreate(outputbase: *const c_char) -> *mut c_void;
-    fn TessHOcrRendererCreate(outputbase: *const c_char) -> *mut c_void;
-    fn TessPDFRendererCreate(
+    pub fn TessTextRendererCreate(outputbase: *const c_char) -> *mut c_void;
+    pub fn TessHOcrRendererCreate(outputbase: *const c_char) -> *mut c_void;
+    pub fn TessPDFRendererCreate(
         outputbase: *const c_char,
         datadir: *const c_char,
         textonly: c_int,
     ) -> *mut c_void;
-    fn TessDeleteResultRenderer(renderer: *mut c_void);
-    fn TessResultRendererBeginDocument(renderer: *mut c_void, title: *const c_char) -> c_int;
-    fn TessResultRendererAddImage(renderer: *mut c_void, api: *mut c_void) -> c_int;
-    fn TessResultRendererEndDocument(renderer: *mut c_void) -> c_int;
-    fn TessResultRendererExtention(renderer: *mut c_void) -> *const c_char;
-    fn TessResultRendererTitle(renderer: *mut c_void) -> *const c_char;
-    fn TessResultRendererImageNum(renderer: *mut c_void) -> c_int;
+    pub fn TessDeleteResultRenderer(renderer: *mut c_void);
+    pub fn TessResultRendererBeginDocument(renderer: *mut c_void, title: *const c_char) -> c_int;
+    pub fn TessResultRendererAddImage(renderer: *mut c_void, api: *mut c_void) -> c_int;
+    pub fn TessResultRendererEndDocument(renderer: *mut c_void) -> c_int;
+    pub fn TessResultRendererExtention(renderer: *mut c_void) -> *const c_char;
+    pub fn TessResultRendererTitle(renderer: *mut c_void) -> *const c_char;
+    pub fn TessResultRendererImageNum(renderer: *mut c_void) -> c_int;
 }

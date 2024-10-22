@@ -217,6 +217,66 @@ impl ResultIterator {
             .map_err(|_| TesseractError::MutexLockError)?;
         Ok(unsafe { TessResultIteratorNext(*handle, level as c_int) != 0 })
     }
+
+    /// Gets the current word from the iterator with its bounding box and confidence.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of (text, left, top, right, bottom, confidence) if successful
+    pub fn get_word_with_bounds(&self) -> Result<(String, i32, i32, i32, i32, f32)> {
+        let text = self.get_utf8_text(TessPageIteratorLevel::RIL_WORD)?;
+        let (left, top, right, bottom) = self.get_bounding_box(TessPageIteratorLevel::RIL_WORD)?;
+        let confidence = self.confidence(TessPageIteratorLevel::RIL_WORD)?;
+
+        Ok((text, left, top, right, bottom, confidence))
+    }
+
+    /// Advances the iterator to the next word.
+    ///
+    /// # Returns
+    ///
+    /// Returns true if successful, false if there are no more words
+    pub fn next_word(&self) -> Result<bool> {
+        self.next(TessPageIteratorLevel::RIL_WORD)
+    }
+
+    /// Gets the bounding box for the current element.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - The page iterator level (word, line, paragraph etc.)
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of (left, top, right, bottom) coordinates if successful
+    pub fn get_bounding_box(&self, level: TessPageIteratorLevel) -> Result<(i32, i32, i32, i32)> {
+        let mut left = 0;
+        let mut top = 0;
+        let mut right = 0;
+        let mut bottom = 0;
+
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+
+        let result = unsafe {
+            TessPageIteratorBoundingBox(
+                *handle,
+                level as c_int,
+                &mut left,
+                &mut top,
+                &mut right,
+                &mut bottom,
+            )
+        };
+
+        if result == 0 {
+            Err(TesseractError::InvalidParameterError)
+        } else {
+            Ok((left, top, right, bottom))
+        }
+    }
 }
 
 impl Drop for ResultIterator {
@@ -251,4 +311,12 @@ extern "C" {
     pub fn TessResultIteratorSymbolIsSubscript(handle: *mut c_void) -> c_int;
     pub fn TessResultIteratorSymbolIsDropcap(handle: *mut c_void) -> c_int;
     pub fn TessResultIteratorNext(handle: *mut c_void, level: c_int) -> c_int;
+    pub fn TessPageIteratorBoundingBox(
+        handle: *mut c_void,
+        level: c_int,
+        left: *mut c_int,
+        top: *mut c_int,
+        right: *mut c_int,
+        bottom: *mut c_int,
+    ) -> c_int;
 }

@@ -1,9 +1,7 @@
-use crate::api::TessDeleteText;
 use crate::enums::{
     TessOrientation, TessPageIteratorLevel, TessParagraphJustification, TessPolyBlockType,
     TessTextlineOrder, TessWritingDirection,
 };
-use crate::result_iterator::{TessResultIteratorConfidence, TessResultIteratorGetUTF8Text};
 use crate::TesseractError;
 use std::os::raw::{c_float, c_int, c_void};
 use std::sync::Arc;
@@ -26,7 +24,7 @@ impl PageIterator {
     /// # Returns
     ///
     /// Returns the new instance of the PageIterator.
-    pub(crate) fn new(handle: *mut c_void) -> Self {
+    pub fn new(handle: *mut c_void) -> Self {
         PageIterator {
             handle: Arc::new(Mutex::new(handle)),
         }
@@ -230,24 +228,6 @@ impl PageIterator {
             ))
         }
     }
-
-    pub fn get_utf8_text(&self, level: TessPageIteratorLevel) -> Result<String, TesseractError> {
-        let handle = self.handle.lock().unwrap();
-        let text = unsafe { TessResultIteratorGetUTF8Text(*handle, level as c_int) };
-        if text.is_null() {
-            Err(TesseractError::InvalidParameterError)
-        } else {
-            let result = unsafe { std::ffi::CStr::from_ptr(text).to_string_lossy().to_string() };
-            unsafe { TessDeleteText(text) };
-            Ok(result)
-        }
-    }
-
-    pub fn confidence(&self, level: TessPageIteratorLevel) -> Result<f32, TesseractError> {
-        let handle = self.handle.lock().unwrap();
-        let confidence = unsafe { TessResultIteratorConfidence(*handle, level as c_int) };
-        Ok(confidence)
-    }
 }
 
 impl Drop for PageIterator {
@@ -259,13 +239,16 @@ impl Drop for PageIterator {
 
 #[link(name = "tesseract")]
 extern "C" {
-    fn TessPageIteratorDelete(handle: *mut c_void);
-    fn TessPageIteratorBegin(handle: *mut c_void);
-    fn TessPageIteratorNext(handle: *mut c_void, level: c_int) -> c_int;
-    fn TessPageIteratorIsAtBeginningOf(handle: *mut c_void, level: c_int) -> c_int;
-    fn TessPageIteratorIsAtFinalElement(handle: *mut c_void, level: c_int, element: c_int)
-        -> c_int;
-    fn TessPageIteratorBoundingBox(
+    pub fn TessPageIteratorDelete(handle: *mut c_void);
+    pub fn TessPageIteratorBegin(handle: *mut c_void);
+    pub fn TessPageIteratorNext(handle: *mut c_void, level: c_int) -> c_int;
+    pub fn TessPageIteratorIsAtBeginningOf(handle: *mut c_void, level: c_int) -> c_int;
+    pub fn TessPageIteratorIsAtFinalElement(
+        handle: *mut c_void,
+        level: c_int,
+        element: c_int,
+    ) -> c_int;
+    pub fn TessPageIteratorBoundingBox(
         handle: *mut c_void,
         level: c_int,
         left: *mut c_int,
@@ -273,8 +256,8 @@ extern "C" {
         right: *mut c_int,
         bottom: *mut c_int,
     ) -> c_int;
-    fn TessPageIteratorBlockType(handle: *mut c_void) -> c_int;
-    fn TessPageIteratorBaseline(
+    pub fn TessPageIteratorBlockType(handle: *mut c_void) -> c_int;
+    pub fn TessPageIteratorBaseline(
         handle: *mut c_void,
         level: c_int,
         x1: *mut c_int,
@@ -282,7 +265,7 @@ extern "C" {
         x2: *mut c_int,
         y2: *mut c_int,
     ) -> c_int;
-    fn TessPageIteratorOrientation(
+    pub fn TessPageIteratorOrientation(
         handle: *mut c_void,
         orientation: *mut c_int,
         writing_direction: *mut c_int,
@@ -290,7 +273,7 @@ extern "C" {
         deskew_angle: *mut c_float,
     ) -> c_int;
     pub fn TessBaseAPIGetIterator(handle: *mut c_void) -> *mut c_void;
-    fn TessPageIteratorParagraphInfo(
+    pub fn TessPageIteratorParagraphInfo(
         handle: *mut c_void,
         justification: *mut c_int,
         is_list_item: *mut bool,

@@ -221,12 +221,12 @@ impl Drop for MutableIterator {
 }
 
 extern "C" {
-    fn TessMutableIteratorSetValue(
+    pub fn TessMutableIteratorSetValue(
         handle: *mut c_void,
         level: c_int,
         value: *const c_char,
     ) -> c_int;
-    fn TessMutableIteratorDelete(handle: *mut c_void) -> c_int;
-    fn TessResultIteratorDelete(handle: *mut c_void);
-    fn TessDeleteText(text: *mut c_char);
+    pub fn TessMutableIteratorDelete(handle: *mut c_void) -> c_int;
+    pub fn TessResultIteratorDelete(handle: *mut c_void);
+    pub fn TessDeleteText(text: *mut c_char);
 }
