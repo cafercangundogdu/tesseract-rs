@@ -1314,6 +1314,19 @@ impl TesseractAPI {
             Ok(c_str.to_str()?.to_owned())
         }
     }
+
+    /// Gets a page iterator for analyzing layout and getting bounding boxes
+    pub fn analyze_layout(&self) -> Result<PageIterator> {
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        let iterator = unsafe { TessBaseAPIAnalyseLayout(*handle) };
+        if iterator.is_null() {
+            return Err(TesseractError::NullPointerError);
+        }
+        Ok(PageIterator::new(iterator))
+    }
 }
 
 #[cfg(feature = "build-tesseract")]
