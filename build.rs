@@ -11,13 +11,14 @@ mod build_tesseract {
         "https://github.com/tesseract-ocr/tesseract/archive/refs/heads/main.zip";
 
     pub fn build() {
-        let home_dir = env::var("HOME").expect("HOME environment variable not set");
         let custom_out_dir = if cfg!(target_os = "macos") {
+            let home_dir = env::var("HOME").expect("HOME environment variable not set");
             PathBuf::from(home_dir)
                 .join("Library")
                 .join("Application Support")
                 .join("tesseract-rs")
         } else if cfg!(target_os = "linux") {
+            let home_dir = env::var("HOME").expect("HOME environment variable not set");
             PathBuf::from(home_dir).join(".tesseract-rs")
         } else if cfg!(target_os = "windows") {
             PathBuf::from(env::var("APPDATA").expect("APPDATA environment variable not set"))
