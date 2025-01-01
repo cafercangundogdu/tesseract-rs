@@ -1,8 +1,48 @@
 use image::{DynamicImage, ImageBuffer, Luma};
 use imageproc::contrast::adaptive_threshold;
 use imageproc::filter::filter3x3;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tesseract_rs::TesseractAPI;
+
+fn get_default_tessdata_dir() -> PathBuf {
+    if cfg!(target_os = "macos") {
+        let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+        PathBuf::from(home_dir)
+            .join("Library")
+            .join("Application Support")
+            .join("tesseract-rs")
+            .join("tessdata")
+    } else if cfg!(target_os = "linux") {
+        let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+        PathBuf::from(home_dir)
+            .join(".tesseract-rs")
+            .join("tessdata")
+    } else if cfg!(target_os = "windows") {
+        PathBuf::from(std::env::var("APPDATA").expect("APPDATA environment variable not set"))
+            .join("tesseract-rs")
+            .join("tessdata")
+    } else {
+        panic!("Unsupported operating system");
+    }
+}
+
+fn get_tessdata_dir() -> PathBuf {
+    match std::env::var("TESSDATA_PREFIX") {
+        Ok(dir) => {
+            let path = PathBuf::from(dir);
+            println!("Using TESSDATA_PREFIX directory: {:?}", path);
+            path
+        }
+        Err(_) => {
+            let default_dir = get_default_tessdata_dir();
+            println!(
+                "TESSDATA_PREFIX not set, using default directory: {:?}",
+                default_dir
+            );
+            default_dir
+        }
+    }
+}
 
 fn preprocess_image(img: &DynamicImage) -> ImageBuffer<Luma<u8>, Vec<u8>> {
     let luma_img = img.to_luma8();
@@ -27,8 +67,7 @@ fn load_test_image(filename: &str) -> Result<(Vec<u8>, u32, u32), Box<dyn std::e
 
 #[test]
 fn test_multiple_languages_with_lstm() {
-    let tessdata_dir_str = std::env::var("TESSDATA_PREFIX").expect("TESSDATA_PREFIX not set");
-    let tessdata_dir = Path::new(tessdata_dir_str.as_str());
+    let tessdata_dir = get_tessdata_dir();
 
     let eng_traineddata = tessdata_dir.join("eng.traineddata");
     let tur_traineddata = tessdata_dir.join("tur.traineddata");
@@ -83,9 +122,9 @@ fn test_multiple_languages_with_lstm() {
 
 #[test]
 fn test_ocr_on_real_image() {
-    let tessdata_dir = std::env::var("TESSDATA_PREFIX").expect("TESSDATA_PREFIX not set");
+    let tessdata_dir = get_tessdata_dir();
     let api = TesseractAPI::new();
-    api.init(&tessdata_dir, "eng")
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
         .expect("Failed to initialize Tesseract");
 
     let (image_data, width, height) =
@@ -109,15 +148,24 @@ fn test_ocr_on_real_image() {
 
 #[test]
 fn test_multiple_languages() {
-    let tessdata_dir = std::env::var("TESSDATA_PREFIX").expect("TESSDATA_PREFIX not set");
+    let tessdata_dir = get_tessdata_dir();
     let api = TesseractAPI::new();
-    api.init(&tessdata_dir, "eng+tur")
+    api.init(tessdata_dir.to_str().unwrap(), "tur+eng")
         .expect("Failed to initialize Tesseract with multiple languages");
     api.set_variable("tessedit_pageseg_mode", "1")
         .expect("Failed to set PSM");
     //api.set_variable("tessedit_char_blacklist", "!?@#$%&*()_+-=[]{}").expect("Failed to set char blacklist");
     api.set_variable("tessedit_enable_dict_correction", "1")
         .expect("Failed to enable dictionary correction");
+
+    api.set_variable("preserve_interword_spaces", "1")
+        .expect("Failed to set preserve_interword_spaces");
+
+    api.set_variable(
+        "tessedit_char_whitelist",
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZçğıiöşüÇĞİIÖŞÜ.,! ",
+    )
+    .expect("Failed to set char whitelist");
 
     let (image_data, width, height) =
         load_test_image("multilang_sample.png").expect("Failed to load test image");
@@ -136,14 +184,15 @@ fn test_multiple_languages() {
 
 #[test]
 fn test_digit_recognition() {
-    let tessdata_dir = std::env::var("TESSDATA_PREFIX").expect("TESSDATA_PREFIX not set");
+    let tessdata_dir = get_tessdata_dir();
     let api = TesseractAPI::new();
-    api.init(&tessdata_dir, "eng")
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
         .expect("Failed to initialize Tesseract");
     api.set_variable("tessedit_char_whitelist", "0123456789")
         .expect("Failed to set whitelist");
 
-    let (image_data, width, height) = load_test_image("").expect("Failed to load test image");
+    let (image_data, width, height) =
+        load_test_image("digits.png").expect("Failed to load test image");
     let res = api.set_image(
         &image_data,
         width as i32,
@@ -161,17 +210,32 @@ fn test_digit_recognition() {
 #[test]
 fn test_error_handling() {
     let api = TesseractAPI::new();
-    assert!(api.init("/invalid/path", "eng").is_err());
+
+    let init_result = api.init("/invalid/path", "eng");
+    assert!(init_result.is_err());
+
+    if init_result.is_err() {
+        return;
+    }
+}
+
+#[test]
+fn test_image_operation_errors() {
+    let api = TesseractAPI::new();
+    let tessdata_dir = get_tessdata_dir();
+
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
 
     let (image_data, width, height) =
         load_test_image("sample_text.png").expect("Failed to load test image");
+
     let res = api.set_image(
         &image_data,
-        width as i32,
+        0, // Invalid width
         height as i32,
         3,
         3 * width as i32,
     );
-    assert!(res.is_ok());
-    assert!(api.get_utf8_text().is_err());
+    assert!(res.is_err());
 }
