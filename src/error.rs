@@ -1,36 +1,44 @@
 use std::str::Utf8Error;
 use thiserror::Error;
 
-/// Tesseract API kullanırken oluşabilecek hatalar.
+/// Errors that can occur when using the Tesseract API.
 #[derive(Error, Debug)]
 pub enum TesseractError {
-    #[error("Tesseract başlatılamadı")]
+    #[error("Failed to initialize Tesseract")]
     InitError,
-    #[error("Görüntü ayarlanamadı")]
+    #[error("Failed to set image")]
     SetImageError,
-    #[error("OCR işlemi gerçekleştirilemedi")]
+    #[error("OCR operation failed")]
     OcrError,
-    #[error("Tesseract çıktısında geçersiz UTF-8")]
+    #[error("Invalid UTF-8 in Tesseract output")]
     Utf8Error(#[from] Utf8Error),
-    #[error("Mutex kilitleme hatası")]
+    #[error("Failed to lock mutex")]
     MutexLockError,
-    #[error("Değişken ayarlanamadı")]
+    #[error("Failed to set variable")]
     SetVariableError,
-    #[error("Değişken alınamadı")]
+    #[error("Failed to get variable")]
     GetVariableError,
-    #[error("Null işaretçi hatası")]
+    #[error("Null pointer error")]
     NullPointerError,
-    #[error("Geçersiz parametre")]
+    #[error("Invalid parameter")]
     InvalidParameterError,
-    #[error("Düzen analizi başarısız oldu")]
+    #[error("Layout analysis failed")]
     AnalyseLayoutError,
-    #[error("Sayfa işleme başarısız oldu")]
+    #[error("Page processing failed")]
     ProcessPagesError,
-    #[error("G/Ç hatası")]
+    #[error("I/O error")]
     IoError,
-    #[error("Mutex hatası")]
+    #[error("Mutex error")]
     MutexError,
+    #[error("Invalid dimensions")]
+    InvalidDimensions,
+    #[error("Invalid bytes per pixel")]
+    InvalidBytesPerPixel,
+    #[error("Invalid bytes per line")]
+    InvalidBytesPerLine,
+    #[error("Invalid image data")]
+    InvalidImageData,
 }
 
-/// Tesseract işlemleri için sonuç türü.
+/// Result type for Tesseract operations.
 pub type Result<T> = std::result::Result<T, TesseractError>;
