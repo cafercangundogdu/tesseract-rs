@@ -38,6 +38,8 @@ pub enum TesseractError {
     InvalidBytesPerLine,
     #[error("Invalid image data")]
     InvalidImageData,
+    #[error("Uninitialized error")]
+    UninitializedError,
 }
 
 /// Result type for Tesseract operations.
