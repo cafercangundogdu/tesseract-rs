@@ -403,26 +403,48 @@ mod build_tesseract {
     where
         F: FnOnce(),
     {
-        let lib_name = format!("lib{}.a", name);
+        let lib_name = if cfg!(target_os = "windows") {
+            // .lib for Windows
+            format!("{}.lib", name)
+        } else {
+            // .a for Unix
+            format!("lib{}.a", name)
+        };
+
         let cached_path = cache_dir.join(&lib_name);
         let out_path = install_dir.join("lib").join(&lib_name);
 
+        fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
+        fs::create_dir_all(out_path.parent().unwrap()).expect("Failed to create output directory");
+
         if cached_path.exists() {
             println!("Using cached {} library", name);
-            fs::create_dir_all(out_path.parent().unwrap())
-                .expect("Failed to create output directory");
-            fs::copy(&cached_path, &out_path).expect("Failed to copy cached library");
+            if let Err(e) = fs::copy(&cached_path, &out_path) {
+                println!("cargo:warning=Failed to copy cached library: {}", e);
+                // If cache copy fails, rebuild
+                build_fn();
+            }
         } else {
             println!("Building {} library", name);
             build_fn();
-            fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
-            fs::copy(&out_path, &cached_path).expect("Failed to cache library");
+
+            if out_path.exists() {
+                if let Err(e) = fs::copy(&out_path, &cached_path) {
+                    println!("cargo:warning=Failed to cache library: {}", e);
+                }
+            } else {
+                println!(
+                    "cargo:warning=Expected library not found at: {}",
+                    out_path.display()
+                );
+            }
         }
 
         println!(
             "cargo:rustc-link-search=native={}",
             install_dir.join("lib").display()
         );
+
         println!("cargo:rustc-link-lib=static={}", name);
     }
 }
