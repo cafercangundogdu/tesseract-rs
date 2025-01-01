@@ -1149,10 +1149,30 @@ impl TesseractAPI {
         bytes_per_pixel: i32,
         bytes_per_line: i32,
     ) -> Result<()> {
+        // Validate input parameters
+        if width <= 0 || height <= 0 {
+            return Err(TesseractError::InvalidDimensions);
+        }
+
+        if bytes_per_pixel <= 0 {
+            return Err(TesseractError::InvalidBytesPerPixel);
+        }
+
+        if bytes_per_line < width * bytes_per_pixel {
+            return Err(TesseractError::InvalidBytesPerLine);
+        }
+
+        // Check if image_data size matches the parameters
+        let expected_size = (height * bytes_per_line) as usize;
+        if image_data.len() < expected_size {
+            return Err(TesseractError::InvalidImageData);
+        }
+
         let handle = self
             .handle
             .lock()
             .map_err(|_| TesseractError::MutexLockError)?;
+
         unsafe {
             TessBaseAPISetImage(
                 *handle,
@@ -1233,13 +1253,25 @@ impl TesseractAPI {
             .handle
             .lock()
             .map_err(|_| TesseractError::MutexLockError)?;
+
+        // Check if handle is properly initialized
+        if *handle == std::ptr::null_mut() {
+            return Err(TesseractError::InitError);
+        }
+
         let text_ptr = unsafe { TessBaseAPIGetUTF8Text(*handle) };
         if text_ptr.is_null() {
             return Err(TesseractError::OcrError);
         }
-        let c_str = unsafe { CStr::from_ptr(text_ptr) };
-        let result = c_str.to_str()?.to_owned();
-        unsafe { TessDeleteText(text_ptr) };
+
+        // Safely convert C string to Rust string
+        let result = unsafe {
+            let c_str = CStr::from_ptr(text_ptr);
+            let result = c_str.to_str()?.to_owned();
+            TessDeleteText(text_ptr);
+            result
+        };
+
         Ok(result)
     }
 
