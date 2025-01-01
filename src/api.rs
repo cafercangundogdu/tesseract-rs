@@ -3,16 +3,25 @@ use crate::error::{Result, TesseractError};
 use crate::page_iterator::{TessBaseAPIGetIterator, TessPageIteratorDelete};
 use crate::result_iterator::TessResultIteratorDelete;
 use crate::{PageIterator, ResultIterator};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_double, c_float, c_int, c_void};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+
+#[derive(Clone)]
+pub struct TesseractConfiguration {
+    datapath: String,
+    language: String,
+    variables: HashMap<String, String>,
+}
 
 /// Main interface to the Tesseract OCR engine.
 #[cfg(feature = "build-tesseract")]
 pub struct TesseractAPI {
     /// Handle to the Tesseract engine.
     pub handle: Arc<Mutex<*mut c_void>>,
+    config: Arc<Mutex<TesseractConfiguration>>,
 }
 
 unsafe impl Send for TesseractAPI {}
@@ -29,6 +38,11 @@ impl TesseractAPI {
         let handle = unsafe { TessBaseAPICreate() };
         TesseractAPI {
             handle: Arc::new(Mutex::new(handle)),
+            config: Arc::new(Mutex::new(TesseractConfiguration {
+                datapath: String::new(),
+                language: String::new(),
+                variables: HashMap::new(),
+            })),
         }
     }
 
@@ -55,8 +69,21 @@ impl TesseractAPI {
     ///
     /// Returns `Ok(())` if initialization is successful, otherwise returns an error.
     pub fn init<P: AsRef<Path>>(&self, datapath: P, language: &str) -> Result<()> {
-        let datapath = CString::new(datapath.as_ref().to_str().unwrap()).unwrap();
-        let language = CString::new(language).unwrap();
+        let datapath_str = datapath.as_ref().to_str().unwrap().to_owned();
+        let language_str = language.to_owned();
+
+        // Önce konfigürasyonu güncelle
+        {
+            let mut config = self
+                .config
+                .lock()
+                .map_err(|_| TesseractError::MutexLockError)?;
+            config.datapath = datapath_str.clone();
+            config.language = language_str.clone();
+        }
+
+        let datapath = CString::new(datapath_str).unwrap();
+        let language = CString::new(language_str).unwrap();
         let handle = self
             .handle
             .lock()
@@ -114,6 +141,14 @@ impl TesseractAPI {
     ///
     /// Returns `Ok(())` if setting the variable is successful, otherwise returns an error.
     pub fn set_variable(&self, name: &str, value: &str) -> Result<()> {
+        {
+            let mut config = self
+                .config
+                .lock()
+                .map_err(|_| TesseractError::MutexLockError)?;
+            config.variables.insert(name.to_owned(), value.to_owned());
+        }
+
         let name = CString::new(name).unwrap();
         let value = CString::new(value).unwrap();
         let handle = self
@@ -1256,7 +1291,7 @@ impl TesseractAPI {
 
         // Check if handle is properly initialized
         if *handle == std::ptr::null_mut() {
-            return Err(TesseractError::InitError);
+            return Err(TesseractError::UninitializedError);
         }
 
         let text_ptr = unsafe { TessBaseAPIGetUTF8Text(*handle) };
@@ -1396,9 +1431,39 @@ impl TesseractAPI {
 impl Drop for TesseractAPI {
     /// Drops the TesseractAPI instance.
     fn drop(&mut self) {
-        if let Ok(handle) = self.handle.lock() {
-            unsafe { TessBaseAPIDelete(*handle) };
+        let handle = self.handle.lock().unwrap();
+        unsafe {
+            if !(*handle).is_null() {
+                TessBaseAPIEnd(*handle);
+                TessBaseAPIDelete(*handle);
+            }
         }
+    }
+}
+
+#[cfg(feature = "build-tesseract")]
+impl Clone for TesseractAPI {
+    /// Clones the TesseractAPI instance.
+    fn clone(&self) -> Self {
+        let config = {
+            let config_guard = self.config.lock().unwrap();
+            config_guard.clone()
+        };
+
+        let new_handle = unsafe { TessBaseAPICreate() };
+        let new_api = TesseractAPI {
+            handle: Arc::new(Mutex::new(new_handle)),
+            config: Arc::new(Mutex::new(config.clone())),
+        };
+
+        if !config.datapath.is_empty() {
+            new_api.init(&config.datapath, &config.language).unwrap();
+            for (name, value) in &config.variables {
+                new_api.set_variable(name, value).unwrap();
+            }
+        }
+
+        new_api
     }
 }
 
