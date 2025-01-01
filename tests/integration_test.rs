@@ -239,3 +239,266 @@ fn test_image_operation_errors() {
     );
     assert!(res.is_err());
 }
+
+#[test]
+fn test_invalid_language_code() {
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+
+    // Test invalid language code
+    let result = api.init(tessdata_dir.to_str().unwrap(), "invalid_lang");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_empty_image_data() {
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
+
+    // Test with empty image data
+    let empty_data: Vec<u8> = Vec::new();
+    let res = api.set_image(&empty_data, 100, 100, 3, 300);
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_invalid_image_parameters() {
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
+
+    let (image_data, width, height) =
+        load_test_image("sample_text.png").expect("Failed to load test image");
+
+    // Test negative dimensions
+    let res = api.set_image(&image_data, -1, height as i32, 3, 3 * width as i32);
+    assert!(res.is_err());
+
+    // Test zero height
+    let res = api.set_image(&image_data, width as i32, 0, 3, 3 * width as i32);
+    assert!(res.is_err());
+
+    // Test invalid bytes_per_pixel
+    let res = api.set_image(
+        &image_data,
+        width as i32,
+        height as i32,
+        0,
+        3 * width as i32,
+    );
+    assert!(res.is_err());
+
+    // Test mismatched bytes_per_line
+    let res = api.set_image(&image_data, width as i32, height as i32, 3, width as i32); // Should be 3 * width
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_variable_setting() {
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
+
+    // Test invalid variable name
+    let res = api.set_variable("invalid_variable_name", "1");
+    assert!(res.is_err());
+
+    // Test empty variable value
+    let res = api.set_variable("tessedit_char_whitelist", "");
+    assert!(res.is_ok()); // Empty whitelist is actually valid
+
+    // Test valid variable settings
+    assert!(api.set_variable("tessedit_pageseg_mode", "1").is_ok());
+    assert!(api.set_variable("tessedit_ocr_engine_mode", "1").is_ok());
+}
+
+#[test]
+fn test_multiple_operations() {
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
+
+    let (image_data, width, height) =
+        load_test_image("sample_text.png").expect("Failed to load test image");
+
+    // Set image multiple times
+    for _ in 0..3 {
+        let res = api.set_image(
+            &image_data,
+            width as i32,
+            height as i32,
+            3,
+            3 * width as i32,
+        );
+        assert!(res.is_ok());
+        let text = api.get_utf8_text().expect("Failed to perform OCR");
+        assert!(!text.is_empty());
+    }
+}
+
+#[test]
+fn test_preprocessing_effects() {
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
+
+    let img = image::open("tests/test_images/sample_text.png").expect("Failed to open image");
+
+    // Test with preprocessed image
+    let preprocessed = preprocess_image(&img);
+    let (width, height) = preprocessed.dimensions();
+
+    let res = api.set_image(
+        preprocessed.as_raw(),
+        width as i32,
+        height as i32,
+        1,
+        width as i32,
+    );
+    assert!(res.is_ok());
+
+    let text = api.get_utf8_text().expect("Failed to perform OCR");
+    assert!(!text.is_empty());
+}
+
+#[test]
+fn test_concurrent_access() {
+    use std::thread;
+
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
+
+    // Multiple threads trying to access the API simultaneously
+    let mut handles = vec![];
+
+    for i in 0..3 {
+        let api_clone = api.clone();
+        let handle = thread::spawn(move || {
+            match i % 3 {
+                0 => {
+                    let res = api_clone.set_variable("tessedit_pageseg_mode", "1");
+                    assert!(res.is_ok());
+                }
+                1 => {
+                    let res = api_clone.set_variable("tessedit_char_whitelist", "0123456789");
+                    assert!(res.is_ok());
+                }
+                2 => {
+                    let text = api_clone.get_utf8_text();
+                    // Text might be empty since we haven't set an image, but it shouldn't panic
+                    assert!(text.is_err());
+                }
+                _ => unreachable!(),
+            }
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all threads to complete
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+
+#[test]
+fn test_thread_safety_with_image() {
+    use std::sync::Arc;
+    use std::thread;
+
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+
+    // Ana API'yi configure et
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize Tesseract");
+    api.set_variable("tessedit_pageseg_mode", "1")
+        .expect("Failed to set PSM");
+
+    let (image_data, width, height) =
+        load_test_image("sample_text.png").expect("Failed to load test image");
+
+    // Image'ı ana thread'de set et
+    let res = api.set_image(
+        &image_data,
+        width as i32,
+        height as i32,
+        3,
+        3 * width as i32,
+    );
+    assert!(res.is_ok());
+
+    let image_data = Arc::new(image_data);
+    let mut handles = vec![];
+
+    // Thread'lerde clone'lanmış API'yi kullan
+    for _ in 0..3 {
+        let api_clone = api.clone(); // Bu artık tüm konfigürasyonu da kopyalayacak
+        let image_data = Arc::clone(&image_data);
+
+        let handle = thread::spawn(move || {
+            let res = api_clone.set_image(
+                &image_data,
+                width as i32,
+                height as i32,
+                3,
+                3 * width as i32,
+            );
+            assert!(res.is_ok());
+
+            let text = api_clone.get_utf8_text().expect("Failed to get text");
+            assert!(!text.is_empty());
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+
+#[test]
+fn test_thread_safety_init() {
+    use std::thread;
+
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new();
+
+    let mut handles = vec![];
+
+    // Try to initialize from multiple threads
+    for i in 0..3 {
+        let api_clone = api.clone();
+        let tessdata_dir = tessdata_dir.clone();
+
+        let handle = thread::spawn(move || {
+            let lang = match i % 3 {
+                0 => "eng",
+                1 => "tur",
+                2 => "eng+tur",
+                _ => unreachable!(),
+            };
+
+            let res = api_clone.init(tessdata_dir.to_str().unwrap(), lang);
+            // Note: Only one initialization should succeed due to mutex
+            if res.is_err() {
+                println!(
+                    "Init failed for lang {}, which is expected in some cases",
+                    lang
+                );
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
