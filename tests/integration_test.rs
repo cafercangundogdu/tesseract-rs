@@ -502,3 +502,74 @@ fn test_thread_safety_init() {
         handle.join().unwrap();
     }
 }
+
+#[test]
+fn test_dynamic_image_setting() {
+    let api = TesseractAPI::new();
+
+    // Get tessdata directory (uses default location or TESSDATA_PREFIX if set)
+    let tessdata_dir = get_tessdata_dir();
+    api.init(tessdata_dir.to_str().unwrap(), "eng")
+        .expect("Failed to initialize API");
+
+    // Create a 24x24 pixel test image with the number 9 (black on white background)
+    let width = 24;
+    let height = 24;
+    let bytes_per_pixel = 1;
+    let bytes_per_line = width * bytes_per_pixel;
+
+    // Initialize image data with all white pixels
+    let mut image_data = vec![255u8; width * height];
+
+    // Draw the number 9 (simplified version)
+    for y in 4..19 {
+        for x in 7..17 {
+            // Top bar
+            if y == 4 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+            // Top curve left side
+            if y >= 4 && y <= 10 && x == 7 {
+                image_data[y * width + x] = 0;
+            }
+            // Top curve right side
+            if y >= 4 && y <= 11 && x == 16 {
+                image_data[y * width + x] = 0;
+            }
+            // Middle bar
+            if y == 11 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+            // Bottom right vertical line
+            if y >= 11 && y <= 18 && x == 16 {
+                image_data[y * width + x] = 0;
+            }
+            // Bottom bar
+            if y == 18 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+        }
+    }
+
+    // Set the image data
+    api.set_image(
+        &image_data,
+        width.try_into().unwrap(),
+        height.try_into().unwrap(),
+        bytes_per_pixel.try_into().unwrap(),
+        bytes_per_line.try_into().unwrap(),
+    )
+    .expect("Failed to set image");
+
+    // Set whitelist for digits only
+    api.set_variable("tessedit_char_whitelist", "0123456789")
+        .expect("Failed to set whitelist");
+
+    // Get the recognized text
+    let text = api.get_utf8_text().expect("Failed to get text");
+    println!("Recognized text: {}", text.trim());
+
+    // Check if the result contains the digit 9
+    assert!(!text.trim().is_empty(), "OCR result is empty");
+    assert!(text.trim().contains("9"), "Expected digit '9' not found");
+}
