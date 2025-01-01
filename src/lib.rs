@@ -13,6 +13,7 @@
 //!
 //! ```rust
 //! use std::path::PathBuf;
+//! use std::error::Error;
 //! use tesseract_rs::TesseractAPI;
 //!
 //! fn get_default_tessdata_dir() -> PathBuf {
@@ -55,23 +56,63 @@
 //!     }
 //! }
 //!
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! fn main() -> Result<(), Box<dyn Error>> {
 //!     let api = TesseractAPI::new();
+//!
+//!     // Get tessdata directory (uses default location or TESSDATA_PREFIX if set)
 //!     let tessdata_dir = get_tessdata_dir();
 //!     api.init(tessdata_dir.to_str().unwrap(), "eng")?;
 //!
-//!     // Assume we have a 3x3 black and white image with a "1"
-//!     let image_data: Vec<u8> = vec![
-//!         0xFF, 0x00, 0xFF,
-//!         0x00, 0x00, 0xFF,
-//!         0x00, 0x00, 0xFF,
-//!     ];
+//!     let width = 24;
+//!     let height = 24;
+//!     let bytes_per_pixel = 1;
+//!     let bytes_per_line = width * bytes_per_pixel;
 //!
-//!     api.set_image(&image_data, 3, 3, 1, 3)?;
+//!     // Initialize image data with all white pixels
+//!     let mut image_data = vec![255u8; width * height];
+//!
+//!     // Draw number 9 with clearer distinction
+//!     for y in 4..19 {
+//!         for x in 7..17 {
+//!             // Top bar
+//!             if y == 4 && x >= 8 && x <= 15 {
+//!                 image_data[y * width + x] = 0;
+//!             }
+//!             // Top curve left side
+//!             if y >= 4 && y <= 10 && x == 7 {
+//!                 image_data[y * width + x] = 0;
+//!             }
+//!             // Top curve right side
+//!             if y >= 4 && y <= 11 && x == 16 {
+//!                 image_data[y * width + x] = 0;
+//!             }
+//!             // Middle bar
+//!             if y == 11 && x >= 8 && x <= 15 {
+//!                 image_data[y * width + x] = 0;
+//!             }
+//!             // Bottom right vertical line
+//!             if y >= 11 && y <= 18 && x == 16 {
+//!                 image_data[y * width + x] = 0;
+//!             }
+//!             // Bottom bar
+//!             if y == 18 && x >= 8 && x <= 15 {
+//!                 image_data[y * width + x] = 0;
+//!             }
+//!         }
+//!     }
+//!
+//!     // Set the image data
+//!     api.set_image(&image_data, width.try_into().unwrap(), height.try_into().unwrap(), bytes_per_pixel.try_into().unwrap(), bytes_per_line.try_into().unwrap())?;
+//!
+//!     // Set whitelist for digits only
 //!     api.set_variable("tessedit_char_whitelist", "0123456789")?;
 //!
+//!     // Set PSM mode to single character
+//!     api.set_variable("tessedit_pageseg_mode", "10")?;
+//!
+//!     // Get the recognized text
 //!     let text = api.get_utf8_text()?;
-//!     println!("Recognized text: {}", text);
+//!     println!("Recognized text: {}", text.trim());
 //!
 //!     Ok(())
 //! }

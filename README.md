@@ -113,7 +113,7 @@ Test images are located in the `tests/test_images/` directory:
 
 Here's a basic example of how to use `tesseract-rs`:
 
-````rust
+```rust
 use std::path::PathBuf;
 use std::error::Error;
 use tesseract_rs::TesseractAPI;
@@ -159,30 +159,64 @@ fn get_tessdata_dir() -> PathBuf {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Initialize Tesseract API
     let api = TesseractAPI::new()?;
 
     // Get tessdata directory (uses default location or TESSDATA_PREFIX if set)
     let tessdata_dir = get_tessdata_dir();
     api.init(tessdata_dir.to_str().unwrap(), "eng")?;
 
-    // Create a simple test image (8x8 pixels, black text on white background)
-    let image_data: Vec<u8> = vec![
-        255, 255, 255, 255, 255, 255, 255, 255,
-        255, 0,   0,   0,   0,   0,   255, 255,
-        255, 0,   255, 255, 255, 0,   255, 255,
-        255, 0,   255, 255, 255, 0,   255, 255,
-        255, 0,   255, 255, 255, 0,   255, 255,
-        255, 0,   255, 255, 255, 0,   255, 255,
-        255, 0,   0,   0,   0,   0,   255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255,
-    ];
+    let width = 24;
+    let height = 24;
+    let bytes_per_pixel = 1;
+    let bytes_per_line = width * bytes_per_pixel;
 
-    // Set the image data (8x8 pixels, 1 byte per pixel, 8 bytes per row)
-    api.set_image(&image_data, 8, 8, 1, 8)?;
+    // Initialize image data with all white pixels
+    let mut image_data = vec![255u8; width * height];
+
+    // Draw number 9 with clearer distinction
+    for y in 4..19 {
+        for x in 7..17 {
+            // Top bar
+            if y == 4 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+            // Top curve left side
+            if y >= 4 && y <= 10 && x == 7 {
+                image_data[y * width + x] = 0;
+            }
+            // Top curve right side
+            if y >= 4 && y <= 11 && x == 16 {
+                image_data[y * width + x] = 0;
+            }
+            // Middle bar
+            if y == 11 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+            // Bottom right vertical line
+            if y >= 11 && y <= 18 && x == 16 {
+                image_data[y * width + x] = 0;
+            }
+            // Bottom bar
+            if y == 18 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+        }
+    }
+
+    // Set the image data
+    api.set_image(
+        &image_data,
+        width.try_into().unwrap(),
+        height.try_into().unwrap(),
+        bytes_per_pixel.try_into().unwrap(),
+        bytes_per_line.try_into().unwrap(),
+    )?;
 
     // Set whitelist for digits only
     api.set_variable("tessedit_char_whitelist", "0123456789")?;
+
+    // Set PSM mode to single character
+    api.set_variable("tessedit_pageseg_mode", "10")?;
 
     // Get the recognized text
     let text = api.get_utf8_text()?;
@@ -190,31 +224,78 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+```
 
 ## Advanced Usage
 
-The API provides additional functionality for more complex OCR tasks:
+The API provides additional functionality for more complex OCR tasks, including thread-safe operations:
 
 ```rust
 use tesseract_rs::TesseractAPI;
+use std::sync::Arc;
+use std::thread;
+use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut api = TesseractAPI::new()?;
+    let tessdata_dir = get_tessdata_dir();
+    let api = TesseractAPI::new()?;
 
-    // Initialize with Turkish language
-    api.init(None, "tur")?;
+    // Initialize the main API
+    api.init(tessdata_dir.to_str().unwrap(), "eng")?;
+    api.set_variable("tessedit_pageseg_mode", "1")?;
 
-    // Configure OCR settings
-    api.set_variable("tessedit_pageseg_mode", "1")?; // Automatic page segmentation
+    // Load and prepare image data
+    let (image_data, width, height) = load_test_image("sample_text.png")?;
 
-    // Get iterators for detailed analysis
-    let (page_iter, result_iter) = api.get_iterators()?;
+    // Share image data across threads
+    let image_data = Arc::new(image_data);
+    let mut handles = vec![];
 
-    // ... process results
+    // Spawn multiple threads for parallel OCR processing
+    for _ in 0..3 {
+        let api_clone = api.clone(); // Clones the API with all configurations
+        let image_data = Arc::clone(&image_data);
+
+        let handle = thread::spawn(move || {
+            // Set image in each thread
+            let res = api_clone.set_image(
+                &image_data,
+                width as i32,
+                height as i32,
+                3,
+                3 * width as i32,
+            );
+            assert!(res.is_ok());
+
+            // Perform OCR in parallel
+            let text = api_clone.get_utf8_text()
+                .expect("Failed to get text");
+            println!("Thread result: {}", text);
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all threads to complete
+    for handle in handles {
+        handle.join().unwrap();
+    }
 
     Ok(())
 }
-````
+
+// Helper function to get tessdata directory
+fn get_tessdata_dir() -> PathBuf {
+    // ... (implementation as shown in basic example)
+}
+
+// Helper function to load test image
+fn load_test_image(filename: &str) -> Result<(Vec<u8>, u32, u32), Box<dyn Error>> {
+    let img = image::open(filename)?
+        .to_rgb8();
+    let (width, height) = img.dimensions();
+    Ok((img.into_raw(), width, height))
+}
+```
 
 ## Building
 
@@ -245,3 +326,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Acknowledgements
 
 This project uses [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) and [Leptonica](http://leptonica.org/). We are grateful to the maintainers and contributors of these projects.
+
+```
+
+```
