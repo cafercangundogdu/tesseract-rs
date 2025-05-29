@@ -207,8 +207,16 @@ mod build_tesseract {
                     .define("SW_BUILD", "OFF")
                     .define("LEPT_TIFF_RESULT", "FALSE")
                     .define("INSTALL_CONFIGS", "ON")
-                    .define("USE_SYSTEM_ICU", "ON")
-                    .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
+                    .define("USE_SYSTEM_ICU", "ON");
+
+                // Add architecture-specific configuration for Windows
+                #[cfg(target_os = "windows")]
+                {
+                    tesseract_config
+                        .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
+                        .define("CMAKE_SYSTEM_NAME", "Windows")
+                        .define("CMAKE_SYSTEM_VERSION", "10");
+                }
 
                 for (key, value) in &additional_defines {
                     tesseract_config.define(key, value);
@@ -296,8 +304,13 @@ mod build_tesseract {
         } else if cfg!(target_os = "windows") {
             // Windows-specific MSVC flags
             cmake_cxx_flags.push_str("/EHsc /MP ");
+            // Add architecture-specific flags for x86_64
+            cmake_cxx_flags.push_str("/arch:AVX2 ");
             additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD".to_string()));
             additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd".to_string()));
+            // Add architecture-specific defines
+            additional_defines.push(("_M_X64".to_string(), "1".to_string()));
+            additional_defines.push(("_M_AMD64".to_string(), "1".to_string()));
         }
 
         // Common flags and defines for all platforms
