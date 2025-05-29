@@ -215,6 +215,28 @@ mod build_tesseract {
                 }
 
                 tesseract_config.build();
+
+                // --- BEGIN: Ensure generic tesseract.lib exists on Windows ---
+                #[cfg(target_os = "windows")]
+                {
+                    let lib_dir = tesseract_install_dir.join("lib");
+                    let generic = lib_dir.join("tesseract.lib");
+                    if !generic.exists() {
+                        if let Ok(entries) = fs::read_dir(&lib_dir) {
+                            for entry in entries.flatten() {
+                                let path = entry.path();
+                                if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                                    if fname.starts_with("tesseract") && fname.ends_with(".lib") && fname != "tesseract.lib" {
+                                        let _ = fs::copy(&path, &generic);
+                                        println!("cargo:warning=Copied {:?} to tesseract.lib", path);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // --- END: Ensure generic tesseract.lib exists on Windows ---
             },
         );
 
