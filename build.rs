@@ -16,9 +16,9 @@ mod build_tesseract {
             let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
             let vsdevcmd = format!("{}\\Common7\\Tools\\VsDevCmd.bat", vs_path);
             
-            // Run the VS environment setup script
+            // Run the VS environment setup script with ARM64 architecture
             let output = std::process::Command::new("cmd")
-                .args(&["/C", &vsdevcmd, "&&", "set"])
+                .args(&["/C", &vsdevcmd, "-arch=arm64", "-host_arch=arm64", "&&", "set"])
                 .output()
                 .expect("Failed to run VsDevCmd.bat");
 
@@ -29,6 +29,13 @@ mod build_tesseract {
                     std::env::set_var(key, value);
                 }
             }
+
+            // Print environment variables for debugging
+            println!("cargo:warning=VS_PATH: {}", vs_path);
+            println!("cargo:warning=VSDEVCMD: {}", vsdevcmd);
+            println!("cargo:warning=PATH: {}", std::env::var("PATH").unwrap_or_default());
+            println!("cargo:warning=INCLUDE: {}", std::env::var("INCLUDE").unwrap_or_default());
+            println!("cargo:warning=LIB: {}", std::env::var("LIB").unwrap_or_default());
         }
 
         let custom_out_dir = if cfg!(target_os = "macos") {
@@ -126,6 +133,11 @@ mod build_tesseract {
                     println!("cargo:warning=Using MSVC version: {}", msvc_version);
                     println!("cargo:warning=Compiler path: {}", compiler_path);
                     
+                    // Verify compiler exists
+                    if !std::path::Path::new(&compiler_path).exists() {
+                        panic!("Compiler not found at: {}", compiler_path);
+                    }
+                    
                     leptonica_config
                         .generator("Visual Studio 17 2022")
                         .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
@@ -141,7 +153,11 @@ mod build_tesseract {
                         .env("CMAKE_C_COMPILER", &compiler_path)
                         .env("CMAKE_CXX_COMPILER", &compiler_path)
                         .env("PATH", format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64;{}", 
-                            vs_path, msvc_version, env::var("PATH").unwrap_or_default()));
+                            vs_path, msvc_version, env::var("PATH").unwrap_or_default()))
+                        .env("INCLUDE", format!("{}\\VC\\Tools\\MSVC\\{}\\include;{}", 
+                            vs_path, msvc_version, env::var("INCLUDE").unwrap_or_default()))
+                        .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
+                            vs_path, msvc_version, env::var("LIB").unwrap_or_default()));
                 } else {
                     leptonica_config
                         .generator("Visual Studio 17 2022")
