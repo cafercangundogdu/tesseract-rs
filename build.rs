@@ -138,6 +138,16 @@ mod build_tesseract {
                         panic!("Compiler not found at: {}", compiler_path);
                     }
                     
+                    // Clean any existing CMake cache
+                    let cmake_cache = leptonica_dir.join("CMakeCache.txt");
+                    let cmake_files = leptonica_dir.join("CMakeFiles");
+                    if cmake_cache.exists() {
+                        std::fs::remove_file(cmake_cache).expect("Failed to remove CMakeCache.txt");
+                    }
+                    if cmake_files.exists() {
+                        std::fs::remove_dir_all(cmake_files).expect("Failed to remove CMakeFiles directory");
+                    }
+                    
                     leptonica_config
                         .generator("Visual Studio 17 2022")
                         .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
@@ -153,6 +163,7 @@ mod build_tesseract {
                         .define("CMAKE_HOST_SYSTEM_PROCESSOR", "ARM64")
                         .define("CMAKE_HOST_SYSTEM_NAME", "Windows")
                         .define("CMAKE_HOST_SYSTEM_VERSION", "10")
+                        .define("CMAKE_GENERATOR_TOOLSET", "v143")
                         .env("CC", &compiler_path)
                         .env("CXX", &compiler_path)
                         .env("CMAKE_C_COMPILER", &compiler_path)
@@ -164,8 +175,8 @@ mod build_tesseract {
                         .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
                             vs_path, msvc_version, env::var("LIB").unwrap_or_default()));
 
-                    // Remove the -Thost=x64 flag from the CMake command
-                    leptonica_config.define("CMAKE_GENERATOR_TOOLSET", "v143");
+                    // Override the CMake command to remove -Thost=x64
+                    leptonica_config.define("CMAKE_GENERATOR_INSTANCE_PLATFORM", "ARM64");
                 } else {
                     leptonica_config
                         .generator("Visual Studio 17 2022")
@@ -455,6 +466,9 @@ mod build_tesseract {
                 additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "ARM64".to_string()));
                 additional_defines.push(("CMAKE_HOST_SYSTEM_PROCESSOR".to_string(), "ARM64".to_string()));
                 additional_defines.push(("CMAKE_GENERATOR_TOOLSET".to_string(), "v143".to_string()));
+                additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET".to_string(), "v143".to_string()));
+                additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET_VERSION".to_string(), "14.3".to_string()));
+                additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE".to_string(), "ARM64".to_string()));
             } else {
                 // x64-specific flags
                 cmake_cxx_flags.push_str("/arch:AVX2 ");
@@ -471,8 +485,6 @@ mod build_tesseract {
             additional_defines.push(("CMAKE_GENERATOR".to_string(), "Visual Studio 17 2022".to_string()));
             additional_defines.push(("CMAKE_SYSTEM_NAME".to_string(), "Windows".to_string()));
             additional_defines.push(("CMAKE_SYSTEM_VERSION".to_string(), "10".to_string()));
-            additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET".to_string(), "v143".to_string()));
-            additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET_VERSION".to_string(), "14.3".to_string()));
         }
 
         // Common flags and defines for all platforms
