@@ -147,23 +147,54 @@ mod build_tesseract {
                     if cmake_files.exists() {
                         std::fs::remove_dir_all(cmake_files).expect("Failed to remove CMakeFiles directory");
                     }
-                    
-                    leptonica_config
-                        .generator("Visual Studio 17 2022")
-                        .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
-                        .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
-                        .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
-                        .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10")
-                        .define("CMAKE_C_COMPILER", &compiler_path)
-                        .define("CMAKE_CXX_COMPILER", &compiler_path)
-                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64")
-                        .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
-                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3")
-                        .define("CMAKE_HOST_SYSTEM_PROCESSOR", "ARM64")
-                        .define("CMAKE_HOST_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_HOST_SYSTEM_VERSION", "10")
-                        .define("CMAKE_GENERATOR_TOOLSET", "v143")
+
+                    // Run CMake directly with our custom command
+                    let status = std::process::Command::new("cmake")
+                        .arg(&leptonica_dir)
+                        .arg("-G")
+                        .arg("Visual Studio 17 2022")
+                        .arg("-A")
+                        .arg("ARM64")
+                        .arg("-DCMAKE_BUILD_TYPE=Release")
+                        .arg("-DBUILD_PROG=OFF")
+                        .arg("-DBUILD_SHARED_LIBS=OFF")
+                        .arg("-DENABLE_ZLIB=OFF")
+                        .arg("-DENABLE_PNG=OFF")
+                        .arg("-DENABLE_JPEG=OFF")
+                        .arg("-DENABLE_TIFF=OFF")
+                        .arg("-DENABLE_WEBP=OFF")
+                        .arg("-DENABLE_OPENJPEG=OFF")
+                        .arg("-DENABLE_GIF=OFF")
+                        .arg("-DNO_CONSOLE_IO=ON")
+                        .arg("-DCMAKE_CXX_FLAGS=/EHsc /MP /DWIN32 /D_WINDOWS /D_ARM64 /D_ARM64_ -DUSE_STD_NAMESPACE")
+                        .arg("-DMINIMUM_SEVERITY=L_SEVERITY_NONE")
+                        .arg("-DSW_BUILD=OFF")
+                        .arg("-DHAVE_LIBZ=0")
+                        .arg("-DENABLE_LTO=OFF")
+                        .arg(format!("-DCMAKE_INSTALL_PREFIX={}", leptonica_install_dir.display()))
+                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
+                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
+                        .arg("-DCMAKE_SYSTEM_PROCESSOR=ARM64")
+                        .arg("-DCMAKE_VS_PLATFORM_NAME=ARM64")
+                        .arg("-DCMAKE_GENERATOR_PLATFORM=ARM64")
+                        .arg("-DCMAKE_GENERATOR_INSTANCE_PLATFORM=ARM64")
+                        .arg("-DCMAKE_HOST_SYSTEM_PROCESSOR=ARM64")
+                        .arg("-DCMAKE_GENERATOR_TOOLSET=v143")
+                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
+                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
+                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE=ARM64")
+                        .arg("-DCMAKE_CXX_FLAGS_RELEASE=/MD")
+                        .arg("-DCMAKE_CXX_FLAGS_DEBUG=/MDd")
+                        .arg("-DCMAKE_GENERATOR=Visual Studio 17 2022")
+                        .arg("-DCMAKE_SYSTEM_NAME=Windows")
+                        .arg("-DCMAKE_SYSTEM_VERSION=10")
+                        .arg("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+                        .arg("-DCMAKE_C_FLAGS= -nologo -MD -Brepro")
+                        .arg("-DCMAKE_C_FLAGS_RELEASE= -nologo -MD -Brepro")
+                        .arg("-DCMAKE_ASM_FLAGS= -nologo -MD -Brepro")
+                        .arg("-DCMAKE_ASM_FLAGS_RELEASE= -nologo -MD -Brepro")
+                        .arg(format!("-DCMAKE_C_COMPILER={}", compiler_path))
+                        .arg(format!("-DCMAKE_CXX_COMPILER={}", compiler_path))
                         .env("CC", &compiler_path)
                         .env("CXX", &compiler_path)
                         .env("CMAKE_C_COMPILER", &compiler_path)
@@ -173,10 +204,41 @@ mod build_tesseract {
                         .env("INCLUDE", format!("{}\\VC\\Tools\\MSVC\\{}\\include;{}", 
                             vs_path, msvc_version, env::var("INCLUDE").unwrap_or_default()))
                         .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
-                            vs_path, msvc_version, env::var("LIB").unwrap_or_default()));
+                            vs_path, msvc_version, env::var("LIB").unwrap_or_default()))
+                        .status()
+                        .expect("Failed to run CMake");
 
-                    // Override the CMake command to remove -Thost=x64
-                    leptonica_config.define("CMAKE_GENERATOR_INSTANCE_PLATFORM", "ARM64");
+                    if !status.success() {
+                        panic!("CMake configuration failed");
+                    }
+
+                    // Run CMake build
+                    let status = std::process::Command::new("cmake")
+                        .arg("--build")
+                        .arg(".")
+                        .arg("--config")
+                        .arg("Release")
+                        .current_dir(&leptonica_dir)
+                        .status()
+                        .expect("Failed to run CMake build");
+
+                    if !status.success() {
+                        panic!("CMake build failed");
+                    }
+
+                    // Run CMake install
+                    let status = std::process::Command::new("cmake")
+                        .arg("--install")
+                        .arg(".")
+                        .arg("--config")
+                        .arg("Release")
+                        .current_dir(&leptonica_dir)
+                        .status()
+                        .expect("Failed to run CMake install");
+
+                    if !status.success() {
+                        panic!("CMake install failed");
+                    }
                 } else {
                     leptonica_config
                         .generator("Visual Studio 17 2022")
