@@ -97,13 +97,27 @@ mod build_tesseract {
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
                 }
+
+                // Set architecture-specific configuration
+                if cfg!(target_arch = "aarch64") {
+                    leptonica_config
+                        .generator("Visual Studio 17 2022")
+                        .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
+                        .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
+                        .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
+                        .define("CMAKE_SYSTEM_NAME", "Windows")
+                        .define("CMAKE_SYSTEM_VERSION", "10");
+                } else {
+                    leptonica_config
+                        .generator("Visual Studio 17 2022")
+                        .define("CMAKE_GENERATOR_PLATFORM", "x64")
+                        .define("CMAKE_VS_PLATFORM_NAME", "x64")
+                        .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
+                        .define("CMAKE_SYSTEM_NAME", "Windows")
+                        .define("CMAKE_SYSTEM_VERSION", "10");
+                }
+
                 leptonica_config
-                    .generator("Visual Studio 17 2022")
-                    .define("CMAKE_GENERATOR_PLATFORM", "x64")
-                    .define("CMAKE_VS_PLATFORM_NAME", "x64")
-                    .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
-                    .define("CMAKE_SYSTEM_NAME", "Windows")
-                    .define("CMAKE_SYSTEM_VERSION", "10")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_PROG", "OFF")
                     .define("BUILD_SHARED_LIBS", "OFF")
@@ -121,12 +135,11 @@ mod build_tesseract {
                     .define("HAVE_LIBZ", "0")
                     .define("ENABLE_LTO", "OFF")
                     .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir)
-                    .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "x64")
                     .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
                     .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
 
-                // Add SIMD-specific configuration for Windows
-                #[cfg(target_os = "windows")]
+                // Add SIMD-specific configuration only for x64
+                #[cfg(not(target_arch = "aarch64"))]
                 {
                     leptonica_config
                         .define("HAVE_AVX2", "1")
@@ -193,13 +206,27 @@ mod build_tesseract {
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
                 }
+
+                // Set architecture-specific configuration
+                if cfg!(target_arch = "aarch64") {
+                    tesseract_config
+                        .generator("Visual Studio 17 2022")
+                        .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
+                        .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
+                        .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
+                        .define("CMAKE_SYSTEM_NAME", "Windows")
+                        .define("CMAKE_SYSTEM_VERSION", "10");
+                } else {
+                    tesseract_config
+                        .generator("Visual Studio 17 2022")
+                        .define("CMAKE_GENERATOR_PLATFORM", "x64")
+                        .define("CMAKE_VS_PLATFORM_NAME", "x64")
+                        .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
+                        .define("CMAKE_SYSTEM_NAME", "Windows")
+                        .define("CMAKE_SYSTEM_VERSION", "10");
+                }
+
                 tesseract_config
-                    .generator("Visual Studio 17 2022")
-                    .define("CMAKE_GENERATOR_PLATFORM", "x64")
-                    .define("CMAKE_VS_PLATFORM_NAME", "x64")
-                    .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
-                    .define("CMAKE_SYSTEM_NAME", "Windows")
-                    .define("CMAKE_SYSTEM_VERSION", "10")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_TRAINING_TOOLS", "OFF")
                     .define("BUILD_SHARED_LIBS", "OFF")
@@ -238,12 +265,11 @@ mod build_tesseract {
                     .define("LEPT_TIFF_RESULT", "FALSE")
                     .define("INSTALL_CONFIGS", "ON")
                     .define("USE_SYSTEM_ICU", "ON")
-                    .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "x64")
                     .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
                     .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
 
-                // Add SIMD-specific configuration for Windows
-                #[cfg(target_os = "windows")]
+                // Add SIMD-specific configuration only for x64
+                #[cfg(not(target_arch = "aarch64"))]
                 {
                     tesseract_config
                         .define("HAVE_AVX2", "1")
@@ -344,26 +370,31 @@ mod build_tesseract {
         } else if cfg!(target_os = "windows") {
             // Windows-specific MSVC flags
             cmake_cxx_flags.push_str("/EHsc /MP ");
-            // Add architecture-specific flags for x86_64
-            cmake_cxx_flags.push_str("/arch:AVX2 ");
-            // Add toolchain and architecture settings
-            cmake_cxx_flags.push_str("/DWIN32 /D_WINDOWS /DWIN64 /D_M_X64 ");
+            
+            // Check if we're on ARM Windows
+            if cfg!(target_arch = "aarch64") {
+                // ARM-specific flags
+                cmake_cxx_flags.push_str("/DWIN32 /D_WINDOWS /D_ARM64 /D_ARM64_ ");
+                additional_defines.push(("CMAKE_SYSTEM_PROCESSOR".to_string(), "ARM64".to_string()));
+                additional_defines.push(("CMAKE_VS_PLATFORM_NAME".to_string(), "ARM64".to_string()));
+                additional_defines.push(("CMAKE_GENERATOR_PLATFORM".to_string(), "ARM64".to_string()));
+                additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "ARM64".to_string()));
+            } else {
+                // x64-specific flags
+                cmake_cxx_flags.push_str("/arch:AVX2 ");
+                cmake_cxx_flags.push_str("/DWIN32 /D_WINDOWS /DWIN64 /D_M_X64 ");
+                additional_defines.push(("CMAKE_SYSTEM_PROCESSOR".to_string(), "AMD64".to_string()));
+                additional_defines.push(("CMAKE_VS_PLATFORM_NAME".to_string(), "x64".to_string()));
+                additional_defines.push(("CMAKE_GENERATOR_PLATFORM".to_string(), "x64".to_string()));
+                additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "x64".to_string()));
+            }
+
+            // Common Windows flags
             additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD".to_string()));
             additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd".to_string()));
-            // Add architecture-specific defines
-            additional_defines.push(("_M_X64".to_string(), "1".to_string()));
-            additional_defines.push(("_M_AMD64".to_string(), "1".to_string()));
-            // Force x64 architecture
-            additional_defines.push(("CMAKE_VS_PLATFORM_NAME".to_string(), "x64".to_string()));
-            additional_defines.push(("CMAKE_GENERATOR_PLATFORM".to_string(), "x64".to_string()));
-            additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "x64".to_string()));
-            // Add CMake generator settings
             additional_defines.push(("CMAKE_GENERATOR".to_string(), "Visual Studio 17 2022".to_string()));
-            additional_defines.push(("CMAKE_SYSTEM_PROCESSOR".to_string(), "AMD64".to_string()));
             additional_defines.push(("CMAKE_SYSTEM_NAME".to_string(), "Windows".to_string()));
             additional_defines.push(("CMAKE_SYSTEM_VERSION".to_string(), "10".to_string()));
-            // Force x64 architecture in CMake
-            additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE".to_string(), "x64".to_string()));
             additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET".to_string(), "v143".to_string()));
             additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET_VERSION".to_string(), "14.3".to_string()));
         }
