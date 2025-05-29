@@ -116,6 +116,21 @@ mod build_tesseract {
                     .define("ENABLE_LTO", "OFF")
                     .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
 
+                // Add SIMD-specific configuration for Windows
+                #[cfg(target_os = "windows")]
+                {
+                    leptonica_config
+                        .define("HAVE_AVX2", "1")
+                        .define("HAVE_FMA", "1")
+                        .define("HAVE_SSE4_1", "1")
+                        .define("HAVE_SSE4_2", "1")
+                        .define("HAVE_SSSE3", "1")
+                        .define("HAVE_SSE3", "1")
+                        .define("HAVE_SSE2", "1")
+                        .define("HAVE_SSE", "1")
+                        .define("HAVE_MMX", "1");
+                }
+
                 for (key, value) in &additional_defines {
                     leptonica_config.define(key, value);
                 }
@@ -219,7 +234,18 @@ mod build_tesseract {
                         .define("CMAKE_VS_PLATFORM_NAME", "x64")
                         .define("CMAKE_GENERATOR_PLATFORM", "x64")
                         .define("CMAKE_GENERATOR", "Visual Studio 17 2022")
-                        .define("CMAKE_GENERATOR_INSTANCE_PLATFORM", "x64");
+                        .define("CMAKE_GENERATOR_INSTANCE_PLATFORM", "x64")
+                        // Add SIMD-specific configuration
+                        .define("HAVE_AVX2", "1")
+                        .define("HAVE_FMA", "1")
+                        .define("HAVE_SSE4_1", "1")
+                        .define("HAVE_SSE4_2", "1")
+                        .define("HAVE_SSSE3", "1")
+                        .define("HAVE_SSE3", "1")
+                        .define("HAVE_SSE2", "1")
+                        .define("HAVE_SSE", "1")
+                        .define("HAVE_MMX", "1")
+                        .define("CMAKE_CXX_FLAGS", "/arch:AVX2 /DWIN32 /D_WINDOWS /DWIN64 /D_M_X64");
                 }
 
                 for (key, value) in &additional_defines {
