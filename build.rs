@@ -185,6 +185,12 @@ mod build_tesseract {
                         .env("CXX", "sccache c++");
                 }
                 tesseract_config
+                    .generator("Visual Studio 17 2022")
+                    .define("CMAKE_GENERATOR_PLATFORM", "x64")
+                    .define("CMAKE_VS_PLATFORM_NAME", "x64")
+                    .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
+                    .define("CMAKE_SYSTEM_NAME", "Windows")
+                    .define("CMAKE_SYSTEM_VERSION", "10")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_TRAINING_TOOLS", "OFF")
                     .define("BUILD_SHARED_LIBS", "OFF")
@@ -224,18 +230,10 @@ mod build_tesseract {
                     .define("INSTALL_CONFIGS", "ON")
                     .define("USE_SYSTEM_ICU", "ON");
 
-                // Add architecture-specific configuration for Windows
+                // Add SIMD-specific configuration for Windows
                 #[cfg(target_os = "windows")]
                 {
                     tesseract_config
-                        .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
-                        .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10")
-                        .define("CMAKE_VS_PLATFORM_NAME", "x64")
-                        .define("CMAKE_GENERATOR_PLATFORM", "x64")
-                        .define("CMAKE_GENERATOR", "Visual Studio 17 2022")
-                        .define("CMAKE_GENERATOR_INSTANCE_PLATFORM", "x64")
-                        // Add SIMD-specific configuration
                         .define("HAVE_AVX2", "1")
                         .define("HAVE_FMA", "1")
                         .define("HAVE_SSE4_1", "1")
