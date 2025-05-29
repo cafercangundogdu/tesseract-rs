@@ -99,29 +99,11 @@ mod build_tesseract {
                 } else if cfg!(target_arch = "aarch64") {
                     // Set ARM64 compiler paths with full paths
                     let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
-                    
-                    // Find the MSVC version
-                    let msvc_path = format!("{}\\VC\\Tools\\MSVC", vs_path);
-                    let msvc_versions = std::fs::read_dir(&msvc_path)
-                        .expect("Failed to read MSVC directory")
-                        .filter_map(|entry| {
-                            entry.ok().and_then(|e| {
-                                e.file_name()
-                                    .to_str()
-                                    .and_then(|s| s.strip_prefix("14."))
-                                    .and_then(|s| s.parse::<f32>().ok())
-                            })
-                        })
-                        .collect::<Vec<f32>>();
-                    
-                    let msvc_version = msvc_versions.iter()
-                        .max_by(|a, b| a.partial_cmp(b).unwrap())
-                        .expect("No MSVC version found");
-                    
-                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\14.{}\\bin\\HostARM64\\ARM64\\cl.exe", 
+                    let msvc_version = "14.44.35207";
+                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64\\cl.exe", 
                         vs_path, msvc_version);
                     
-                    println!("cargo:warning=Using MSVC version: 14.{}", msvc_version);
+                    println!("cargo:warning=Using MSVC version: {}", msvc_version);
                     println!("cargo:warning=Compiler path: {}", compiler_path);
                     
                     leptonica_config
@@ -138,7 +120,7 @@ mod build_tesseract {
                         .env("CXX", &compiler_path)
                         .env("CMAKE_C_COMPILER", &compiler_path)
                         .env("CMAKE_CXX_COMPILER", &compiler_path)
-                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.{}\\bin\\HostARM64\\ARM64;{}", 
+                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64;{}", 
                             vs_path, msvc_version, env::var("PATH").unwrap_or_default()));
                 } else {
                     leptonica_config
@@ -241,29 +223,11 @@ mod build_tesseract {
                 } else if cfg!(target_arch = "aarch64") {
                     // Set ARM64 compiler paths with full paths
                     let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
-                    
-                    // Find the MSVC version
-                    let msvc_path = format!("{}\\VC\\Tools\\MSVC", vs_path);
-                    let msvc_versions = std::fs::read_dir(&msvc_path)
-                        .expect("Failed to read MSVC directory")
-                        .filter_map(|entry| {
-                            entry.ok().and_then(|e| {
-                                e.file_name()
-                                    .to_str()
-                                    .and_then(|s| s.strip_prefix("14."))
-                                    .and_then(|s| s.parse::<f32>().ok())
-                            })
-                        })
-                        .collect::<Vec<f32>>();
-                    
-                    let msvc_version = msvc_versions.iter()
-                        .max_by(|a, b| a.partial_cmp(b).unwrap())
-                        .expect("No MSVC version found");
-                    
-                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\14.{}\\bin\\HostARM64\\ARM64\\cl.exe", 
+                    let msvc_version = "14.44.35207";
+                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64\\cl.exe", 
                         vs_path, msvc_version);
                     
-                    println!("cargo:warning=Using MSVC version: 14.{}", msvc_version);
+                    println!("cargo:warning=Using MSVC version: {}", msvc_version);
                     println!("cargo:warning=Compiler path: {}", compiler_path);
                     
                     tesseract_config
@@ -280,7 +244,7 @@ mod build_tesseract {
                         .env("CXX", &compiler_path)
                         .env("CMAKE_C_COMPILER", &compiler_path)
                         .env("CMAKE_CXX_COMPILER", &compiler_path)
-                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.{}\\bin\\HostARM64\\ARM64;{}", 
+                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64;{}", 
                             vs_path, msvc_version, env::var("PATH").unwrap_or_default()));
                 } else {
                     tesseract_config
