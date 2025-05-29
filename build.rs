@@ -102,16 +102,6 @@ mod build_tesseract {
                     let compiler_path = format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64\\cl.exe", vs_path);
                     
                     leptonica_config
-                        .env("CC", &compiler_path)
-                        .env("CXX", &compiler_path)
-                        .env("CMAKE_C_COMPILER", &compiler_path)
-                        .env("CMAKE_CXX_COMPILER", &compiler_path)
-                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64;{}", vs_path, env::var("PATH").unwrap_or_default()));
-                }
-
-                // Set architecture-specific configuration
-                if cfg!(target_arch = "aarch64") {
-                    leptonica_config
                         .generator("Visual Studio 17 2022")
                         .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
                         .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
@@ -120,7 +110,12 @@ mod build_tesseract {
                         .define("CMAKE_SYSTEM_VERSION", "10")
                         .define("CMAKE_C_COMPILER", &compiler_path)
                         .define("CMAKE_CXX_COMPILER", &compiler_path)
-                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64");
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64")
+                        .env("CC", &compiler_path)
+                        .env("CXX", &compiler_path)
+                        .env("CMAKE_C_COMPILER", &compiler_path)
+                        .env("CMAKE_CXX_COMPILER", &compiler_path)
+                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64;{}", vs_path, env::var("PATH").unwrap_or_default()));
                 } else {
                     leptonica_config
                         .generator("Visual Studio 17 2022")
@@ -225,16 +220,6 @@ mod build_tesseract {
                     let compiler_path = format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64\\cl.exe", vs_path);
                     
                     tesseract_config
-                        .env("CC", &compiler_path)
-                        .env("CXX", &compiler_path)
-                        .env("CMAKE_C_COMPILER", &compiler_path)
-                        .env("CMAKE_CXX_COMPILER", &compiler_path)
-                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64;{}", vs_path, env::var("PATH").unwrap_or_default()));
-                }
-
-                // Set architecture-specific configuration
-                if cfg!(target_arch = "aarch64") {
-                    tesseract_config
                         .generator("Visual Studio 17 2022")
                         .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
                         .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
@@ -243,7 +228,12 @@ mod build_tesseract {
                         .define("CMAKE_SYSTEM_VERSION", "10")
                         .define("CMAKE_C_COMPILER", &compiler_path)
                         .define("CMAKE_CXX_COMPILER", &compiler_path)
-                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64");
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64")
+                        .env("CC", &compiler_path)
+                        .env("CXX", &compiler_path)
+                        .env("CMAKE_C_COMPILER", &compiler_path)
+                        .env("CMAKE_CXX_COMPILER", &compiler_path)
+                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64;{}", vs_path, env::var("PATH").unwrap_or_default()));
                 } else {
                     tesseract_config
                         .generator("Visual Studio 17 2022")
