@@ -98,6 +98,12 @@ mod build_tesseract {
                         .env("CXX", "sccache c++");
                 }
                 leptonica_config
+                    .generator("Visual Studio 17 2022")
+                    .define("CMAKE_GENERATOR_PLATFORM", "x64")
+                    .define("CMAKE_VS_PLATFORM_NAME", "x64")
+                    .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
+                    .define("CMAKE_SYSTEM_NAME", "Windows")
+                    .define("CMAKE_SYSTEM_VERSION", "10")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_PROG", "OFF")
                     .define("BUILD_SHARED_LIBS", "OFF")
