@@ -96,6 +96,13 @@ mod build_tesseract {
                     leptonica_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
+                } else if cfg!(target_arch = "aarch64") {
+                    // Set ARM64 compiler paths
+                    leptonica_config
+                        .env("CC", "cl.exe")
+                        .env("CXX", "cl.exe")
+                        .env("CMAKE_C_COMPILER", "cl.exe")
+                        .env("CMAKE_CXX_COMPILER", "cl.exe");
                 }
 
                 // Set architecture-specific configuration
@@ -106,7 +113,10 @@ mod build_tesseract {
                         .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
                         .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
                         .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10");
+                        .define("CMAKE_SYSTEM_VERSION", "10")
+                        .define("CMAKE_C_COMPILER", "cl.exe")
+                        .define("CMAKE_CXX_COMPILER", "cl.exe")
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64");
                 } else {
                     leptonica_config
                         .generator("Visual Studio 17 2022")
@@ -205,6 +215,13 @@ mod build_tesseract {
                     tesseract_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
+                } else if cfg!(target_arch = "aarch64") {
+                    // Set ARM64 compiler paths
+                    tesseract_config
+                        .env("CC", "cl.exe")
+                        .env("CXX", "cl.exe")
+                        .env("CMAKE_C_COMPILER", "cl.exe")
+                        .env("CMAKE_CXX_COMPILER", "cl.exe");
                 }
 
                 // Set architecture-specific configuration
@@ -215,7 +232,10 @@ mod build_tesseract {
                         .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
                         .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
                         .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10");
+                        .define("CMAKE_SYSTEM_VERSION", "10")
+                        .define("CMAKE_C_COMPILER", "cl.exe")
+                        .define("CMAKE_CXX_COMPILER", "cl.exe")
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64");
                 } else {
                     tesseract_config
                         .generator("Visual Studio 17 2022")
