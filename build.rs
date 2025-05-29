@@ -127,7 +127,7 @@ mod build_tesseract {
                 .arg("-DENABLE_OPENJPEG=OFF")
                 .arg("-DENABLE_GIF=OFF")
                 .arg("-DNO_CONSOLE_IO=ON")
-                .arg("-DCMAKE_CXX_FLAGS=/EHsc /MP /DWIN32 /D_WINDOWS /D_ARM64 /D_ARM64_ -DUSE_STD_NAMESPACE")
+                .arg("-DCMAKE_CXX_FLAGS=/EHsc /MP /DWIN32 /D_WINDOWS /D_ARM64 /D_ARM64_ -DUSE_STD_NAMESPACE /std:c++17")
                 .arg("-DMINIMUM_SEVERITY=L_SEVERITY_NONE")
                 .arg("-DSW_BUILD=OFF")
                 .arg("-DHAVE_LIBZ=0")
@@ -156,6 +156,8 @@ mod build_tesseract {
                 .arg("-DCMAKE_ASM_FLAGS_RELEASE= -nologo -MD -Brepro")
                 .arg(format!("-DCMAKE_C_COMPILER={}", cmake_compiler_path))
                 .arg(format!("-DCMAKE_CXX_COMPILER={}", cmake_compiler_path))
+                .arg("-DCMAKE_CXX_STANDARD=17")
+                .arg("-DCMAKE_CXX_STANDARD_REQUIRED=ON")
                 .env("CC", &compiler_path)
                 .env("CXX", &compiler_path)
                 .env("CMAKE_C_COMPILER", &compiler_path)
@@ -283,7 +285,9 @@ mod build_tesseract {
                         .define("ENABLE_LTO", "OFF")
                         .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir)
                         .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
-                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3")
+                        .define("CMAKE_CXX_STANDARD", "17")
+                        .define("CMAKE_CXX_STANDARD_REQUIRED", "ON");
 
                     // Add SIMD-specific configuration only for x64
                     #[cfg(not(target_arch = "aarch64"))]
@@ -421,8 +425,11 @@ mod build_tesseract {
                 .arg("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
                 .arg("-DCMAKE_C_FLAGS= -nologo -MD -Brepro")
                 .arg("-DCMAKE_C_FLAGS_RELEASE= -nologo -MD -Brepro")
+                .arg("-DCMAKE_CXX_FLAGS=/EHsc /MP /DWIN32 /D_WINDOWS /D_ARM64 /D_ARM64_ -DUSE_STD_NAMESPACE /std:c++17")
                 .arg(format!("-DCMAKE_C_COMPILER={}", cmake_compiler_path))
                 .arg(format!("-DCMAKE_CXX_COMPILER={}", cmake_compiler_path))
+                .arg("-DCMAKE_CXX_STANDARD=17")
+                .arg("-DCMAKE_CXX_STANDARD_REQUIRED=ON")
                 .env("CC", &compiler_path)
                 .env("CXX", &compiler_path)
                 .env("CMAKE_C_COMPILER", &compiler_path)
@@ -531,30 +538,32 @@ mod build_tesseract {
                         .define("DISABLE_PNG", "ON")
                         .define("DISABLE_JPEG", "ON")
                         .define("DISABLE_WEBP", "ON")
-                        .define("DISABLE_OPENJPEG", "ON")
-                        .define("DISABLE_ZLIB", "ON")
-                        .define("DISABLE_LIBXML2", "ON")
-                        .define("DISABLE_LIBICU", "ON")
-                        .define("DISABLE_LZMA", "ON")
-                        .define("DISABLE_GIF", "ON")
-                        .define("DISABLE_DEBUG_MESSAGES", "ON")
+                        .define("DISABLE_OPENJPEG=ON")
+                        .define("DISABLE_ZLIB=ON")
+                        .define("DISABLE_LIBXML2=ON")
+                        .define("DISABLE_LIBICU=ON")
+                        .define("DISABLE_LZMA=ON")
+                        .define("DISABLE_GIF=ON")
+                        .define("DISABLE_DEBUG_MESSAGES=ON")
                         .define("debug_file", "/dev/null")
-                        .define("HAVE_LIBARCHIVE", "OFF")
-                        .define("HAVE_LIBCURL", "OFF")
-                        .define("HAVE_TIFFIO_H", "OFF")
-                        .define("GRAPHICS_DISABLED", "ON")
-                        .define("DISABLED_LEGACY_ENGINE", "ON")
-                        .define("USE_OPENCL", "OFF")
-                        .define("OPENMP_BUILD", "OFF")
-                        .define("BUILD_TESTS", "OFF")
-                        .define("ENABLE_LTO", "OFF")
-                        .define("BUILD_PROG", "OFF")
-                        .define("SW_BUILD", "OFF")
-                        .define("LEPT_TIFF_RESULT", "FALSE")
-                        .define("INSTALL_CONFIGS", "ON")
-                        .define("USE_SYSTEM_ICU", "ON")
+                        .define("HAVE_LIBARCHIVE=OFF")
+                        .define("HAVE_LIBCURL=OFF")
+                        .define("HAVE_TIFFIO_H=OFF")
+                        .define("GRAPHICS_DISABLED=ON")
+                        .define("DISABLED_LEGACY_ENGINE=ON")
+                        .define("USE_OPENCL=OFF")
+                        .define("OPENMP_BUILD=OFF")
+                        .define("BUILD_TESTS=OFF")
+                        .define("ENABLE_LTO=OFF")
+                        .define("BUILD_PROG=OFF")
+                        .define("SW_BUILD=OFF")
+                        .define("LEPT_TIFF_RESULT=FALSE")
+                        .define("INSTALL_CONFIGS=ON")
+                        .define("USE_SYSTEM_ICU=ON")
                         .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
-                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3")
+                        .define("CMAKE_CXX_STANDARD", "17")
+                        .define("CMAKE_CXX_STANDARD_REQUIRED", "ON");
 
                     // Add SIMD-specific configuration only for x64
                     #[cfg(not(target_arch = "aarch64"))]
@@ -569,7 +578,7 @@ mod build_tesseract {
                             .define("HAVE_SSE2", "1")
                             .define("HAVE_SSE", "1")
                             .define("HAVE_MMX", "1")
-                            .define("CMAKE_CXX_FLAGS", "/arch:AVX2 /DWIN32 /D_WINDOWS /DWIN64 /D_M_X64");
+                            .define("CMAKE_CXX_FLAGS", "/arch:AVX2 /DWIN32 /D_WINDOWS /DWIN64 /D_M_X64 /std:c++17");
                     }
 
                     for (key, value) in &additional_defines {
