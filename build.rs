@@ -215,7 +215,11 @@ mod build_tesseract {
                     tesseract_config
                         .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
                         .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10");
+                        .define("CMAKE_SYSTEM_VERSION", "10")
+                        .define("CMAKE_VS_PLATFORM_NAME", "x64")
+                        .define("CMAKE_GENERATOR_PLATFORM", "x64")
+                        .define("CMAKE_GENERATOR", "Visual Studio 17 2022")
+                        .define("CMAKE_GENERATOR_INSTANCE_PLATFORM", "x64");
                 }
 
                 for (key, value) in &additional_defines {
@@ -306,11 +310,15 @@ mod build_tesseract {
             cmake_cxx_flags.push_str("/EHsc /MP ");
             // Add architecture-specific flags for x86_64
             cmake_cxx_flags.push_str("/arch:AVX2 ");
+            // Add toolchain and architecture settings
+            cmake_cxx_flags.push_str("/DWIN32 /D_WINDOWS /DWIN64 /D_M_X64 ");
             additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD".to_string()));
             additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd".to_string()));
             // Add architecture-specific defines
             additional_defines.push(("_M_X64".to_string(), "1".to_string()));
             additional_defines.push(("_M_AMD64".to_string(), "1".to_string()));
+            additional_defines.push(("CMAKE_VS_PLATFORM_NAME".to_string(), "x64".to_string()));
+            additional_defines.push(("CMAKE_GENERATOR_PLATFORM".to_string(), "x64".to_string()));
         }
 
         // Common flags and defines for all platforms
