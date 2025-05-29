@@ -120,7 +120,10 @@ mod build_tesseract {
                     .define("SW_BUILD", "OFF")
                     .define("HAVE_LIBZ", "0")
                     .define("ENABLE_LTO", "OFF")
-                    .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
+                    .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir)
+                    .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "x64")
+                    .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
+                    .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
 
                 // Add SIMD-specific configuration for Windows
                 #[cfg(target_os = "windows")]
@@ -234,7 +237,10 @@ mod build_tesseract {
                     .define("SW_BUILD", "OFF")
                     .define("LEPT_TIFF_RESULT", "FALSE")
                     .define("INSTALL_CONFIGS", "ON")
-                    .define("USE_SYSTEM_ICU", "ON");
+                    .define("USE_SYSTEM_ICU", "ON")
+                    .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "x64")
+                    .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
+                    .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
 
                 // Add SIMD-specific configuration for Windows
                 #[cfg(target_os = "windows")]
@@ -347,14 +353,19 @@ mod build_tesseract {
             // Add architecture-specific defines
             additional_defines.push(("_M_X64".to_string(), "1".to_string()));
             additional_defines.push(("_M_AMD64".to_string(), "1".to_string()));
+            // Force x64 architecture
             additional_defines.push(("CMAKE_VS_PLATFORM_NAME".to_string(), "x64".to_string()));
             additional_defines.push(("CMAKE_GENERATOR_PLATFORM".to_string(), "x64".to_string()));
+            additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "x64".to_string()));
             // Add CMake generator settings
             additional_defines.push(("CMAKE_GENERATOR".to_string(), "Visual Studio 17 2022".to_string()));
-            additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "x64".to_string()));
             additional_defines.push(("CMAKE_SYSTEM_PROCESSOR".to_string(), "AMD64".to_string()));
             additional_defines.push(("CMAKE_SYSTEM_NAME".to_string(), "Windows".to_string()));
             additional_defines.push(("CMAKE_SYSTEM_VERSION".to_string(), "10".to_string()));
+            // Force x64 architecture in CMake
+            additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE".to_string(), "x64".to_string()));
+            additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET".to_string(), "v143".to_string()));
+            additional_defines.push(("CMAKE_VS_PLATFORM_TOOLSET_VERSION".to_string(), "14.3".to_string()));
         }
 
         // Common flags and defines for all platforms
