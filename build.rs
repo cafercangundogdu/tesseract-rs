@@ -550,7 +550,7 @@ mod build_tesseract {
                         .define("HAVE_LIBCURL", "OFF")
                         .define("HAVE_TIFFIO_H", "OFF")
                         .define("GRAPHICS_DISABLED", "ON")
-                        .define("DISABLED_LEGACY_ENGINE", "ON")
+                        .define("DISABLED_LEGACY_ENGINE", "OFF")
                         .define("USE_OPENCL", "OFF")
                         .define("OPENMP_BUILD", "OFF")
                         .define("BUILD_TESTS", "OFF")
@@ -563,7 +563,9 @@ mod build_tesseract {
                         .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
                         .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3")
                         .define("CMAKE_CXX_STANDARD", "17")
-                        .define("CMAKE_CXX_STANDARD_REQUIRED", "ON");
+                        .define("CMAKE_CXX_STANDARD_REQUIRED", "ON")
+                        .define("ENABLE_SCRIPT_DETECTION", "ON")
+                        .define("ENABLE_WORD_STR", "ON");
 
                     // Add SIMD-specific configuration only for x64
                     #[cfg(not(target_arch = "aarch64"))]
