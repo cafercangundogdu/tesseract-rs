@@ -11,6 +11,26 @@ mod build_tesseract {
         "https://github.com/tesseract-ocr/tesseract/archive/refs/heads/main.zip";
 
     pub fn build() {
+        // Set up Visual Studio environment for ARM64
+        if cfg!(target_arch = "aarch64") {
+            let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
+            let vsdevcmd = format!("{}\\Common7\\Tools\\VsDevCmd.bat", vs_path);
+            
+            // Run the VS environment setup script
+            let output = std::process::Command::new("cmd")
+                .args(&["/C", &vsdevcmd, "&&", "set"])
+                .output()
+                .expect("Failed to run VsDevCmd.bat");
+
+            // Parse the environment variables
+            let env_output = String::from_utf8_lossy(&output.stdout);
+            for line in env_output.lines() {
+                if let Some((key, value)) = line.split_once('=') {
+                    std::env::set_var(key, value);
+                }
+            }
+        }
+
         let custom_out_dir = if cfg!(target_os = "macos") {
             let home_dir = env::var("HOME").expect("HOME environment variable not set");
             PathBuf::from(home_dir)
