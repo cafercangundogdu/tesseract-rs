@@ -187,7 +187,20 @@ mod build_tesseract {
                     .define("LEPT_TIFF_RESULT", "FALSE")
                     .define("INSTALL_CONFIGS", "ON")
                     .define("USE_SYSTEM_ICU", "ON")
-                    .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
+                    .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
+                    .define("DISABLE_SIMD", "ON")
+                    .define("DISABLE_AVX", "ON")
+                    .define("DISABLE_AVX2", "ON")
+                    .define("DISABLE_AVX512F", "ON")
+                    .define("DISABLE_AVX512BW", "ON")
+                    .define("DISABLE_AVX512VNNI", "ON")
+                    .define("DISABLE_FMA", "ON")
+                    .define("DISABLE_SSE", "ON")
+                    .define("DISABLE_SSE2", "ON")
+                    .define("DISABLE_SSE3", "ON")
+                    .define("DISABLE_SSSE3", "ON")
+                    .define("DISABLE_SSE4_1", "ON")
+                    .define("DISABLE_SSE4_2", "ON");
 
                 for (key, value) in &additional_defines {
                     tesseract_config.define(key, value);
@@ -241,8 +254,8 @@ mod build_tesseract {
             // Check if we're on a system using clang
             if cfg!(target_env = "musl")
                 || env::var("CC")
-                    .map(|cc| cc.contains("clang"))
-                    .unwrap_or(false)
+                .map(|cc| cc.contains("clang"))
+                .unwrap_or(false)
             {
                 cmake_cxx_flags.push_str("-stdlib=libc++ ");
                 additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "clang++".to_string()));
@@ -252,9 +265,10 @@ mod build_tesseract {
             }
         } else if cfg!(target_os = "windows") {
             // Windows-specific MSVC flags
-            cmake_cxx_flags.push_str("/EHsc /MP ");
+            cmake_cxx_flags.push_str("/EHsc /MP /arch:AVX2 ");
             additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD".to_string()));
             additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd".to_string()));
+            additional_defines.push(("CMAKE_CXX_FLAGS".to_string(), "/arch:AVX2".to_string()));
         }
 
         // Common flags and defines for all platforms
@@ -273,8 +287,8 @@ mod build_tesseract {
         } else if cfg!(target_os = "linux") {
             if cfg!(target_env = "musl")
                 || env::var("CC")
-                    .map(|cc| cc.contains("clang"))
-                    .unwrap_or(false)
+                .map(|cc| cc.contains("clang"))
+                .unwrap_or(false)
             {
                 println!("cargo:rustc-link-lib=c++");
             } else {
@@ -381,7 +395,7 @@ mod build_tesseract {
                         .as_ref(),
                     &mut dest,
                 )
-                .expect("Failed to write Tessdata");
+                    .expect("Failed to write Tessdata");
                 println!("cargo:warning={} downloaded", filename);
             } else {
                 println!(
@@ -404,47 +418,29 @@ mod build_tesseract {
         F: FnOnce(),
     {
         let lib_name = if cfg!(target_os = "windows") {
-            // .lib for Windows
-            format!("{}.lib", name)
+            format!("{}-1.85.1d.lib", name)
         } else {
-            // .a for Unix
             format!("lib{}.a", name)
         };
-
         let cached_path = cache_dir.join(&lib_name);
         let out_path = install_dir.join("lib").join(&lib_name);
 
-        fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
-        fs::create_dir_all(out_path.parent().unwrap()).expect("Failed to create output directory");
-
         if cached_path.exists() {
             println!("Using cached {} library", name);
-            if let Err(e) = fs::copy(&cached_path, &out_path) {
-                println!("cargo:warning=Failed to copy cached library: {}", e);
-                // If cache copy fails, rebuild
-                build_fn();
-            }
+            fs::create_dir_all(out_path.parent().unwrap())
+                .expect("Failed to create output directory");
+            fs::copy(&cached_path, &out_path).expect("Failed to copy cached library");
         } else {
             println!("Building {} library", name);
             build_fn();
-
-            if out_path.exists() {
-                if let Err(e) = fs::copy(&out_path, &cached_path) {
-                    println!("cargo:warning=Failed to cache library: {}", e);
-                }
-            } else {
-                println!(
-                    "cargo:warning=Expected library not found at: {}",
-                    out_path.display()
-                );
-            }
+            fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
+            fs::copy(&out_path, &cached_path).expect("Failed to cache library");
         }
 
         println!(
             "cargo:rustc-link-search=native={}",
             install_dir.join("lib").display()
         );
-
         println!("cargo:rustc-link-lib=static={}", name);
     }
 }
