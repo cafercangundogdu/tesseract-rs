@@ -102,11 +102,6 @@ mod build_tesseract {
             println!("cargo:warning=Compiler path: {}", compiler_path);
             println!("cargo:warning=CMake compiler path: {}", cmake_compiler_path);
             
-            // Verify compiler exists
-            if !std::path::Path::new(&compiler_path).exists() {
-                panic!("Compiler not found at: {}", compiler_path);
-            }
-            
             // Create build directory
             let build_dir = leptonica_dir.join("build");
             if build_dir.exists() {
@@ -341,146 +336,272 @@ mod build_tesseract {
         let tesseract_cache_dir = cache_dir.join("tesseract");
         let tessdata_prefix = project_dir.join("tessdata");
 
-        build_or_use_cached(
-            "tesseract",
-            &tesseract_cache_dir,
-            &tesseract_install_dir,
-            || {
-                let cmakelists_path = tesseract_dir.join("CMakeLists.txt");
-                let cmakelists = std::fs::read_to_string(&cmakelists_path)
-                    .expect("Failed to read CMakeLists.txt")
-                    .replace("set(HAVE_TIFFIO_H ON)", "");
-                std::fs::write(&cmakelists_path, cmakelists)
-                    .expect("Failed to write CMakeLists.txt");
+        if cfg!(target_arch = "aarch64") {
+            // Set ARM64 compiler paths with full paths
+            let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
+            let msvc_version = "14.44.35207";
+            let compiler_path = format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64\\cl.exe", 
+                vs_path, msvc_version);
+            
+            // Convert Windows path to CMake-compatible path
+            let cmake_compiler_path = compiler_path.replace("\\", "/");
+            
+            println!("cargo:warning=Using MSVC version: {}", msvc_version);
+            println!("cargo:warning=Compiler path: {}", compiler_path);
+            println!("cargo:warning=CMake compiler path: {}", cmake_compiler_path);
+            
+            // Create build directory
+            let build_dir = tesseract_dir.join("build");
+            if build_dir.exists() {
+                std::fs::remove_dir_all(&build_dir).expect("Failed to remove existing build directory");
+            }
+            std::fs::create_dir_all(&build_dir).expect("Failed to create build directory");
 
-                let mut tesseract_config = Config::new(&tesseract_dir);
-                if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
-                    tesseract_config
-                        .env("CC", "sccache cc")
-                        .env("CXX", "sccache c++");
-                } else if cfg!(target_arch = "aarch64") {
-                    // Set ARM64 compiler paths with full paths
-                    let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
-                    let msvc_version = "14.44.35207";
-                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64\\cl.exe", 
-                        vs_path, msvc_version);
-                    
-                    println!("cargo:warning=Using MSVC version: {}", msvc_version);
-                    println!("cargo:warning=Compiler path: {}", compiler_path);
-                    
-                    tesseract_config
-                        .generator("Visual Studio 17 2022")
-                        .define("CMAKE_GENERATOR_PLATFORM", "ARM64")
-                        .define("CMAKE_VS_PLATFORM_NAME", "ARM64")
-                        .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
-                        .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10")
-                        .define("CMAKE_C_COMPILER", &compiler_path)
-                        .define("CMAKE_CXX_COMPILER", &compiler_path)
-                        .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64")
-                        .env("CC", &compiler_path)
-                        .env("CXX", &compiler_path)
-                        .env("CMAKE_C_COMPILER", &compiler_path)
-                        .env("CMAKE_CXX_COMPILER", &compiler_path)
-                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64;{}", 
-                            vs_path, msvc_version, env::var("PATH").unwrap_or_default()));
-                } else {
-                    tesseract_config
-                        .generator("Visual Studio 17 2022")
-                        .define("CMAKE_GENERATOR_PLATFORM", "x64")
-                        .define("CMAKE_VS_PLATFORM_NAME", "x64")
-                        .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
-                        .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10");
+            // Run CMake directly with our custom command
+            let status = std::process::Command::new("cmake")
+                .arg(&tesseract_dir)
+                .arg("-G")
+                .arg("Visual Studio 17 2022")
+                .arg("-A")
+                .arg("ARM64")
+                .arg("-DCMAKE_BUILD_TYPE=Release")
+                .arg("-DBUILD_TRAINING_TOOLS=OFF")
+                .arg("-DBUILD_SHARED_LIBS=OFF")
+                .arg("-DDISABLE_ARCHIVE=ON")
+                .arg("-DDISABLE_CURL=ON")
+                .arg("-DDISABLE_OPENCL=ON")
+                .arg(format!("-DLeptonica_DIR={}", leptonica_install_dir.display()))
+                .arg(format!("-DLEPTONICA_INCLUDE_DIR={}", leptonica_include_dir.display()))
+                .arg(format!("-DLEPTONICA_LIBRARY={}", leptonica_lib_dir.display()))
+                .arg(format!("-DCMAKE_PREFIX_PATH={}", leptonica_install_dir.display()))
+                .arg(format!("-DCMAKE_INSTALL_PREFIX={}", tesseract_install_dir.display()))
+                .arg(format!("-DTESSDATA_PREFIX={}", tessdata_prefix.display()))
+                .arg("-DDISABLE_TIFF=ON")
+                .arg("-DDISABLE_PNG=ON")
+                .arg("-DDISABLE_JPEG=ON")
+                .arg("-DDISABLE_WEBP=ON")
+                .arg("-DDISABLE_OPENJPEG=ON")
+                .arg("-DDISABLE_ZLIB=ON")
+                .arg("-DDISABLE_LIBXML2=ON")
+                .arg("-DDISABLE_LIBICU=ON")
+                .arg("-DDISABLE_LZMA=ON")
+                .arg("-DDISABLE_GIF=ON")
+                .arg("-DDISABLE_DEBUG_MESSAGES=ON")
+                .arg("-Ddebug_file=/dev/null")
+                .arg("-DHAVE_LIBARCHIVE=OFF")
+                .arg("-DHAVE_LIBCURL=OFF")
+                .arg("-DHAVE_TIFFIO_H=OFF")
+                .arg("-DGRAPHICS_DISABLED=ON")
+                .arg("-DDISABLED_LEGACY_ENGINE=ON")
+                .arg("-DUSE_OPENCL=OFF")
+                .arg("-DOPENMP_BUILD=OFF")
+                .arg("-DBUILD_TESTS=OFF")
+                .arg("-DENABLE_LTO=OFF")
+                .arg("-DBUILD_PROG=OFF")
+                .arg("-DSW_BUILD=OFF")
+                .arg("-DLEPT_TIFF_RESULT=FALSE")
+                .arg("-DINSTALL_CONFIGS=ON")
+                .arg("-DUSE_SYSTEM_ICU=ON")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
+                .arg("-DCMAKE_SYSTEM_PROCESSOR=ARM64")
+                .arg("-DCMAKE_VS_PLATFORM_NAME=ARM64")
+                .arg("-DCMAKE_GENERATOR_PLATFORM=ARM64")
+                .arg("-DCMAKE_GENERATOR_INSTANCE_PLATFORM=ARM64")
+                .arg("-DCMAKE_HOST_SYSTEM_PROCESSOR=ARM64")
+                .arg("-DCMAKE_GENERATOR_TOOLSET=v143")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE=ARM64")
+                .arg("-DCMAKE_CXX_FLAGS_RELEASE=/MD")
+                .arg("-DCMAKE_CXX_FLAGS_DEBUG=/MDd")
+                .arg("-DCMAKE_GENERATOR=Visual Studio 17 2022")
+                .arg("-DCMAKE_SYSTEM_NAME=Windows")
+                .arg("-DCMAKE_SYSTEM_VERSION=10")
+                .arg("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+                .arg("-DCMAKE_C_FLAGS= -nologo -MD -Brepro")
+                .arg("-DCMAKE_C_FLAGS_RELEASE= -nologo -MD -Brepro")
+                .arg(format!("-DCMAKE_C_COMPILER={}", cmake_compiler_path))
+                .arg(format!("-DCMAKE_CXX_COMPILER={}", cmake_compiler_path))
+                .env("CC", &compiler_path)
+                .env("CXX", &compiler_path)
+                .env("CMAKE_C_COMPILER", &compiler_path)
+                .env("CMAKE_CXX_COMPILER", &compiler_path)
+                .env("PATH", format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64;{}", 
+                    vs_path, msvc_version, env::var("PATH").unwrap_or_default()))
+                .env("INCLUDE", format!("{}\\VC\\Tools\\MSVC\\{}\\include;{}", 
+                    vs_path, msvc_version, env::var("INCLUDE").unwrap_or_default()))
+                .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
+                    vs_path, msvc_version, env::var("LIB").unwrap_or_default()))
+                .current_dir(&build_dir)
+                .status()
+                .expect("Failed to run CMake");
+
+            if !status.success() {
+                panic!("CMake configuration failed");
+            }
+
+            // Run CMake build
+            let status = std::process::Command::new("cmake")
+                .arg("--build")
+                .arg(".")
+                .arg("--config")
+                .arg("Release")
+                .current_dir(&build_dir)
+                .status()
+                .expect("Failed to run CMake build");
+
+            if !status.success() {
+                panic!("CMake build failed");
+            }
+
+            // Run CMake install
+            let status = std::process::Command::new("cmake")
+                .arg("--install")
+                .arg(".")
+                .arg("--config")
+                .arg("Release")
+                .current_dir(&build_dir)
+                .status()
+                .expect("Failed to run CMake install");
+
+            if !status.success() {
+                panic!("CMake install failed");
+            }
+
+            // Ensure generic tesseract.lib exists
+            let lib_dir = tesseract_install_dir.join("lib");
+            let generic = lib_dir.join("tesseract.lib");
+            if !generic.exists() {
+                if let Ok(entries) = fs::read_dir(&lib_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                            if fname.starts_with("tesseract") && fname.ends_with(".lib") && fname != "tesseract.lib" {
+                                let _ = fs::copy(&path, &generic);
+                                println!("cargo:warning=Copied {:?} to tesseract.lib", path);
+                                break;
+                            }
+                        }
+                    }
                 }
+            }
+        } else {
+            build_or_use_cached(
+                "tesseract",
+                &tesseract_cache_dir,
+                &tesseract_install_dir,
+                || {
+                    let cmakelists_path = tesseract_dir.join("CMakeLists.txt");
+                    let cmakelists = std::fs::read_to_string(&cmakelists_path)
+                        .expect("Failed to read CMakeLists.txt")
+                        .replace("set(HAVE_TIFFIO_H ON)", "");
+                    std::fs::write(&cmakelists_path, cmakelists)
+                        .expect("Failed to write CMakeLists.txt");
 
-                tesseract_config
-                    .define("CMAKE_BUILD_TYPE", "Release")
-                    .define("BUILD_TRAINING_TOOLS", "OFF")
-                    .define("BUILD_SHARED_LIBS", "OFF")
-                    .define("DISABLE_ARCHIVE", "ON")
-                    .define("DISABLE_CURL", "ON")
-                    .define("DISABLE_OPENCL", "ON")
-                    .define("Leptonica_DIR", &leptonica_install_dir)
-                    .define("LEPTONICA_INCLUDE_DIR", &leptonica_include_dir)
-                    .define("LEPTONICA_LIBRARY", &leptonica_lib_dir)
-                    .define("CMAKE_PREFIX_PATH", &leptonica_install_dir)
-                    .define("CMAKE_INSTALL_PREFIX", &tesseract_install_dir)
-                    .define("TESSDATA_PREFIX", &tessdata_prefix)
-                    .define("DISABLE_TIFF", "ON")
-                    .define("DISABLE_PNG", "ON")
-                    .define("DISABLE_JPEG", "ON")
-                    .define("DISABLE_WEBP", "ON")
-                    .define("DISABLE_OPENJPEG", "ON")
-                    .define("DISABLE_ZLIB", "ON")
-                    .define("DISABLE_LIBXML2", "ON")
-                    .define("DISABLE_LIBICU", "ON")
-                    .define("DISABLE_LZMA", "ON")
-                    .define("DISABLE_GIF", "ON")
-                    .define("DISABLE_DEBUG_MESSAGES", "ON")
-                    .define("debug_file", "/dev/null")
-                    .define("HAVE_LIBARCHIVE", "OFF")
-                    .define("HAVE_LIBCURL", "OFF")
-                    .define("HAVE_TIFFIO_H", "OFF")
-                    .define("GRAPHICS_DISABLED", "ON")
-                    .define("DISABLED_LEGACY_ENGINE", "ON")
-                    .define("USE_OPENCL", "OFF")
-                    .define("OPENMP_BUILD", "OFF")
-                    .define("BUILD_TESTS", "OFF")
-                    .define("ENABLE_LTO", "OFF")
-                    .define("BUILD_PROG", "OFF")
-                    .define("SW_BUILD", "OFF")
-                    .define("LEPT_TIFF_RESULT", "FALSE")
-                    .define("INSTALL_CONFIGS", "ON")
-                    .define("USE_SYSTEM_ICU", "ON")
-                    .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
-                    .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
+                    let mut tesseract_config = Config::new(&tesseract_dir);
+                    if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                        tesseract_config
+                            .env("CC", "sccache cc")
+                            .env("CXX", "sccache c++");
+                    } else {
+                        tesseract_config
+                            .generator("Visual Studio 17 2022")
+                            .define("CMAKE_GENERATOR_PLATFORM", "x64")
+                            .define("CMAKE_VS_PLATFORM_NAME", "x64")
+                            .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
+                            .define("CMAKE_SYSTEM_NAME", "Windows")
+                            .define("CMAKE_SYSTEM_VERSION", "10");
+                    }
 
-                // Add SIMD-specific configuration only for x64
-                #[cfg(not(target_arch = "aarch64"))]
-                {
                     tesseract_config
-                        .define("HAVE_AVX2", "1")
-                        .define("HAVE_FMA", "1")
-                        .define("HAVE_SSE4_1", "1")
-                        .define("HAVE_SSE4_2", "1")
-                        .define("HAVE_SSSE3", "1")
-                        .define("HAVE_SSE3", "1")
-                        .define("HAVE_SSE2", "1")
-                        .define("HAVE_SSE", "1")
-                        .define("HAVE_MMX", "1")
-                        .define("CMAKE_CXX_FLAGS", "/arch:AVX2 /DWIN32 /D_WINDOWS /DWIN64 /D_M_X64");
-                }
+                        .define("CMAKE_BUILD_TYPE", "Release")
+                        .define("BUILD_TRAINING_TOOLS", "OFF")
+                        .define("BUILD_SHARED_LIBS", "OFF")
+                        .define("DISABLE_ARCHIVE", "ON")
+                        .define("DISABLE_CURL", "ON")
+                        .define("DISABLE_OPENCL", "ON")
+                        .define("Leptonica_DIR", &leptonica_install_dir)
+                        .define("LEPTONICA_INCLUDE_DIR", &leptonica_include_dir)
+                        .define("LEPTONICA_LIBRARY", &leptonica_lib_dir)
+                        .define("CMAKE_PREFIX_PATH", &leptonica_install_dir)
+                        .define("CMAKE_INSTALL_PREFIX", &tesseract_install_dir)
+                        .define("TESSDATA_PREFIX", &tessdata_prefix)
+                        .define("DISABLE_TIFF", "ON")
+                        .define("DISABLE_PNG", "ON")
+                        .define("DISABLE_JPEG", "ON")
+                        .define("DISABLE_WEBP", "ON")
+                        .define("DISABLE_OPENJPEG", "ON")
+                        .define("DISABLE_ZLIB", "ON")
+                        .define("DISABLE_LIBXML2", "ON")
+                        .define("DISABLE_LIBICU", "ON")
+                        .define("DISABLE_LZMA", "ON")
+                        .define("DISABLE_GIF", "ON")
+                        .define("DISABLE_DEBUG_MESSAGES", "ON")
+                        .define("debug_file", "/dev/null")
+                        .define("HAVE_LIBARCHIVE", "OFF")
+                        .define("HAVE_LIBCURL", "OFF")
+                        .define("HAVE_TIFFIO_H", "OFF")
+                        .define("GRAPHICS_DISABLED", "ON")
+                        .define("DISABLED_LEGACY_ENGINE", "ON")
+                        .define("USE_OPENCL", "OFF")
+                        .define("OPENMP_BUILD", "OFF")
+                        .define("BUILD_TESTS", "OFF")
+                        .define("ENABLE_LTO", "OFF")
+                        .define("BUILD_PROG", "OFF")
+                        .define("SW_BUILD", "OFF")
+                        .define("LEPT_TIFF_RESULT", "FALSE")
+                        .define("INSTALL_CONFIGS", "ON")
+                        .define("USE_SYSTEM_ICU", "ON")
+                        .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
 
-                for (key, value) in &additional_defines {
-                    tesseract_config.define(key, value);
-                }
+                    // Add SIMD-specific configuration only for x64
+                    #[cfg(not(target_arch = "aarch64"))]
+                    {
+                        tesseract_config
+                            .define("HAVE_AVX2", "1")
+                            .define("HAVE_FMA", "1")
+                            .define("HAVE_SSE4_1", "1")
+                            .define("HAVE_SSE4_2", "1")
+                            .define("HAVE_SSSE3", "1")
+                            .define("HAVE_SSE3", "1")
+                            .define("HAVE_SSE2", "1")
+                            .define("HAVE_SSE", "1")
+                            .define("HAVE_MMX", "1")
+                            .define("CMAKE_CXX_FLAGS", "/arch:AVX2 /DWIN32 /D_WINDOWS /DWIN64 /D_M_X64");
+                    }
 
-                tesseract_config.build();
+                    for (key, value) in &additional_defines {
+                        tesseract_config.define(key, value);
+                    }
 
-                // --- BEGIN: Ensure generic tesseract.lib exists on Windows ---
-                #[cfg(target_os = "windows")]
-                {
-                    let lib_dir = tesseract_install_dir.join("lib");
-                    let generic = lib_dir.join("tesseract.lib");
-                    if !generic.exists() {
-                        if let Ok(entries) = fs::read_dir(&lib_dir) {
-                            for entry in entries.flatten() {
-                                let path = entry.path();
-                                if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
-                                    if fname.starts_with("tesseract") && fname.ends_with(".lib") && fname != "tesseract.lib" {
-                                        let _ = fs::copy(&path, &generic);
-                                        println!("cargo:warning=Copied {:?} to tesseract.lib", path);
-                                        break;
+                    tesseract_config.build();
+
+                    // --- BEGIN: Ensure generic tesseract.lib exists on Windows ---
+                    #[cfg(target_os = "windows")]
+                    {
+                        let lib_dir = tesseract_install_dir.join("lib");
+                        let generic = lib_dir.join("tesseract.lib");
+                        if !generic.exists() {
+                            if let Ok(entries) = fs::read_dir(&lib_dir) {
+                                for entry in entries.flatten() {
+                                    let path = entry.path();
+                                    if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                                        if fname.starts_with("tesseract") && fname.ends_with(".lib") && fname != "tesseract.lib" {
+                                            let _ = fs::copy(&path, &generic);
+                                            println!("cargo:warning=Copied {:?} to tesseract.lib", path);
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                // --- END: Ensure generic tesseract.lib exists on Windows ---
-            },
-        );
+                    // --- END: Ensure generic tesseract.lib exists on Windows ---
+                },
+            );
+        }
 
         println!("cargo:rerun-if-changed=build.rs");
         println!("cargo:rerun-if-changed={}", third_party_dir.display());
