@@ -107,15 +107,12 @@ mod build_tesseract {
                 panic!("Compiler not found at: {}", compiler_path);
             }
             
-            // Clean any existing CMake cache
-            let cmake_cache = leptonica_dir.join("CMakeCache.txt");
-            let cmake_files = leptonica_dir.join("CMakeFiles");
-            if cmake_cache.exists() {
-                std::fs::remove_file(cmake_cache).expect("Failed to remove CMakeCache.txt");
+            // Create build directory
+            let build_dir = leptonica_dir.join("build");
+            if build_dir.exists() {
+                std::fs::remove_dir_all(&build_dir).expect("Failed to remove existing build directory");
             }
-            if cmake_files.exists() {
-                std::fs::remove_dir_all(cmake_files).expect("Failed to remove CMakeFiles directory");
-            }
+            std::fs::create_dir_all(&build_dir).expect("Failed to create build directory");
 
             // Run CMake directly with our custom command
             let status = std::process::Command::new("cmake")
@@ -174,6 +171,7 @@ mod build_tesseract {
                     vs_path, msvc_version, env::var("INCLUDE").unwrap_or_default()))
                 .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
                     vs_path, msvc_version, env::var("LIB").unwrap_or_default()))
+                .current_dir(&build_dir)
                 .status()
                 .expect("Failed to run CMake");
 
@@ -187,7 +185,7 @@ mod build_tesseract {
                 .arg(".")
                 .arg("--config")
                 .arg("Release")
-                .current_dir(&leptonica_dir)
+                .current_dir(&build_dir)
                 .status()
                 .expect("Failed to run CMake build");
 
@@ -201,7 +199,7 @@ mod build_tesseract {
                 .arg(".")
                 .arg("--config")
                 .arg("Release")
-                .current_dir(&leptonica_dir)
+                .current_dir(&build_dir)
                 .status()
                 .expect("Failed to run CMake install");
 
