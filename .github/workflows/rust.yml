@@ -41,5 +41,12 @@ jobs:
     - name: Build
       run: cargo build --verbose
       
+    - name: Check for TessMutableIterator symbols in tesseract.lib (Windows only)
+      if: runner.os == 'Windows'
+      shell: cmd
+      run: |
+        set "PATH=%PATH%;C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
+        dumpbin /symbols "%USERPROFILE%\AppData\Roaming\tesseract-rs\tesseract\lib\tesseract.lib" | findstr TessMutableIterator
+    
     - name: Run tests
       run: cargo test --verbose
