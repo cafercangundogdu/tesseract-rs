@@ -88,234 +88,250 @@ mod build_tesseract {
         let leptonica_install_dir = out_dir.join("leptonica");
         let leptonica_cache_dir = cache_dir.join("leptonica");
 
-        build_or_use_cached(
-            "leptonica",
-            &leptonica_cache_dir,
-            &leptonica_install_dir,
-            || {
-                let mut leptonica_config = Config::new(&leptonica_dir);
+        if cfg!(target_arch = "aarch64") {
+            // Set ARM64 compiler paths with full paths
+            let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
+            let msvc_version = "14.44.35207";
+            let compiler_path = format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64\\cl.exe", 
+                vs_path, msvc_version);
+            
+            println!("cargo:warning=Using MSVC version: {}", msvc_version);
+            println!("cargo:warning=Compiler path: {}", compiler_path);
+            
+            // Verify compiler exists
+            if !std::path::Path::new(&compiler_path).exists() {
+                panic!("Compiler not found at: {}", compiler_path);
+            }
+            
+            // Clean any existing CMake cache
+            let cmake_cache = leptonica_dir.join("CMakeCache.txt");
+            let cmake_files = leptonica_dir.join("CMakeFiles");
+            if cmake_cache.exists() {
+                std::fs::remove_file(cmake_cache).expect("Failed to remove CMakeCache.txt");
+            }
+            if cmake_files.exists() {
+                std::fs::remove_dir_all(cmake_files).expect("Failed to remove CMakeFiles directory");
+            }
 
-                let leptonica_src_dir = leptonica_dir.join("src");
-                let environ_h_path = leptonica_src_dir.join("environ.h");
-                let environ_h = std::fs::read_to_string(&environ_h_path)
-                    .expect("Failed to read environ.h")
-                    .replace(
-                        "#define  HAVE_LIBZ          1",
-                        "#define  HAVE_LIBZ          0",
-                    )
-                    .replace(
-                        "#ifdef  NO_CONSOLE_IO",
-                        "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO",
-                    );
-                std::fs::write(environ_h_path, environ_h).expect("Failed to write environ.h");
+            // Run CMake directly with our custom command
+            let status = std::process::Command::new("cmake")
+                .arg(&leptonica_dir)
+                .arg("-G")
+                .arg("Visual Studio 17 2022")
+                .arg("-A")
+                .arg("ARM64")
+                .arg("-DCMAKE_BUILD_TYPE=Release")
+                .arg("-DBUILD_PROG=OFF")
+                .arg("-DBUILD_SHARED_LIBS=OFF")
+                .arg("-DENABLE_ZLIB=OFF")
+                .arg("-DENABLE_PNG=OFF")
+                .arg("-DENABLE_JPEG=OFF")
+                .arg("-DENABLE_TIFF=OFF")
+                .arg("-DENABLE_WEBP=OFF")
+                .arg("-DENABLE_OPENJPEG=OFF")
+                .arg("-DENABLE_GIF=OFF")
+                .arg("-DNO_CONSOLE_IO=ON")
+                .arg("-DCMAKE_CXX_FLAGS=/EHsc /MP /DWIN32 /D_WINDOWS /D_ARM64 /D_ARM64_ -DUSE_STD_NAMESPACE")
+                .arg("-DMINIMUM_SEVERITY=L_SEVERITY_NONE")
+                .arg("-DSW_BUILD=OFF")
+                .arg("-DHAVE_LIBZ=0")
+                .arg("-DENABLE_LTO=OFF")
+                .arg(format!("-DCMAKE_INSTALL_PREFIX={}", leptonica_install_dir.display()))
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
+                .arg("-DCMAKE_SYSTEM_PROCESSOR=ARM64")
+                .arg("-DCMAKE_VS_PLATFORM_NAME=ARM64")
+                .arg("-DCMAKE_GENERATOR_PLATFORM=ARM64")
+                .arg("-DCMAKE_GENERATOR_INSTANCE_PLATFORM=ARM64")
+                .arg("-DCMAKE_HOST_SYSTEM_PROCESSOR=ARM64")
+                .arg("-DCMAKE_GENERATOR_TOOLSET=v143")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
+                .arg("-DCMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE=ARM64")
+                .arg("-DCMAKE_CXX_FLAGS_RELEASE=/MD")
+                .arg("-DCMAKE_CXX_FLAGS_DEBUG=/MDd")
+                .arg("-DCMAKE_GENERATOR=Visual Studio 17 2022")
+                .arg("-DCMAKE_SYSTEM_NAME=Windows")
+                .arg("-DCMAKE_SYSTEM_VERSION=10")
+                .arg("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+                .arg("-DCMAKE_C_FLAGS= -nologo -MD -Brepro")
+                .arg("-DCMAKE_C_FLAGS_RELEASE= -nologo -MD -Brepro")
+                .arg("-DCMAKE_ASM_FLAGS= -nologo -MD -Brepro")
+                .arg("-DCMAKE_ASM_FLAGS_RELEASE= -nologo -MD -Brepro")
+                .arg(format!("-DCMAKE_C_COMPILER={}", compiler_path))
+                .arg(format!("-DCMAKE_CXX_COMPILER={}", compiler_path))
+                .env("CC", &compiler_path)
+                .env("CXX", &compiler_path)
+                .env("CMAKE_C_COMPILER", &compiler_path)
+                .env("CMAKE_CXX_COMPILER", &compiler_path)
+                .env("PATH", format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64;{}", 
+                    vs_path, msvc_version, env::var("PATH").unwrap_or_default()))
+                .env("INCLUDE", format!("{}\\VC\\Tools\\MSVC\\{}\\include;{}", 
+                    vs_path, msvc_version, env::var("INCLUDE").unwrap_or_default()))
+                .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
+                    vs_path, msvc_version, env::var("LIB").unwrap_or_default()))
+                .status()
+                .expect("Failed to run CMake");
 
-                let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
-                let makefile_static = std::fs::read_to_string(&makefile_static_path)
-                    .expect("Failed to read makefile.static")
-                    .replace(
-                        "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
-                        "ALL_LIBS =	$(LEPTLIB) -lm",
-                    );
-                std::fs::write(makefile_static_path, makefile_static)
-                    .expect("Failed to write makefile.static");
+            if !status.success() {
+                panic!("CMake configuration failed");
+            }
 
-                if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
-                    leptonica_config
-                        .env("CC", "sccache cc")
-                        .env("CXX", "sccache c++");
-                } else if cfg!(target_arch = "aarch64") {
-                    // Set ARM64 compiler paths with full paths
-                    let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Preview";
-                    let msvc_version = "14.44.35207";
-                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64\\cl.exe", 
-                        vs_path, msvc_version);
-                    
-                    println!("cargo:warning=Using MSVC version: {}", msvc_version);
-                    println!("cargo:warning=Compiler path: {}", compiler_path);
-                    
-                    // Verify compiler exists
-                    if !std::path::Path::new(&compiler_path).exists() {
-                        panic!("Compiler not found at: {}", compiler_path);
+            // Run CMake build
+            let status = std::process::Command::new("cmake")
+                .arg("--build")
+                .arg(".")
+                .arg("--config")
+                .arg("Release")
+                .current_dir(&leptonica_dir)
+                .status()
+                .expect("Failed to run CMake build");
+
+            if !status.success() {
+                panic!("CMake build failed");
+            }
+
+            // Run CMake install
+            let status = std::process::Command::new("cmake")
+                .arg("--install")
+                .arg(".")
+                .arg("--config")
+                .arg("Release")
+                .current_dir(&leptonica_dir)
+                .status()
+                .expect("Failed to run CMake install");
+
+            if !status.success() {
+                panic!("CMake install failed");
+            }
+
+            // Ensure generic leptonica.lib exists
+            let lib_dir = leptonica_install_dir.join("lib");
+            if let Ok(entries) = fs::read_dir(&lib_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                        if fname.starts_with("leptonica-") && fname.ends_with(".lib") {
+                            let generic = lib_dir.join("leptonica.lib");
+                            if !generic.exists() {
+                                let _ = fs::copy(&path, &generic);
+                                println!("cargo:warning=Copied {:?} to leptonica.lib", path);
+                            }
+                        }
                     }
-                    
-                    // Clean any existing CMake cache
-                    let cmake_cache = leptonica_dir.join("CMakeCache.txt");
-                    let cmake_files = leptonica_dir.join("CMakeFiles");
-                    if cmake_cache.exists() {
-                        std::fs::remove_file(cmake_cache).expect("Failed to remove CMakeCache.txt");
-                    }
-                    if cmake_files.exists() {
-                        std::fs::remove_dir_all(cmake_files).expect("Failed to remove CMakeFiles directory");
-                    }
-
-                    // Run CMake directly with our custom command
-                    let status = std::process::Command::new("cmake")
-                        .arg(&leptonica_dir)
-                        .arg("-G")
-                        .arg("Visual Studio 17 2022")
-                        .arg("-A")
-                        .arg("ARM64")
-                        .arg("-DCMAKE_BUILD_TYPE=Release")
-                        .arg("-DBUILD_PROG=OFF")
-                        .arg("-DBUILD_SHARED_LIBS=OFF")
-                        .arg("-DENABLE_ZLIB=OFF")
-                        .arg("-DENABLE_PNG=OFF")
-                        .arg("-DENABLE_JPEG=OFF")
-                        .arg("-DENABLE_TIFF=OFF")
-                        .arg("-DENABLE_WEBP=OFF")
-                        .arg("-DENABLE_OPENJPEG=OFF")
-                        .arg("-DENABLE_GIF=OFF")
-                        .arg("-DNO_CONSOLE_IO=ON")
-                        .arg("-DCMAKE_CXX_FLAGS=/EHsc /MP /DWIN32 /D_WINDOWS /D_ARM64 /D_ARM64_ -DUSE_STD_NAMESPACE")
-                        .arg("-DMINIMUM_SEVERITY=L_SEVERITY_NONE")
-                        .arg("-DSW_BUILD=OFF")
-                        .arg("-DHAVE_LIBZ=0")
-                        .arg("-DENABLE_LTO=OFF")
-                        .arg(format!("-DCMAKE_INSTALL_PREFIX={}", leptonica_install_dir.display()))
-                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
-                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
-                        .arg("-DCMAKE_SYSTEM_PROCESSOR=ARM64")
-                        .arg("-DCMAKE_VS_PLATFORM_NAME=ARM64")
-                        .arg("-DCMAKE_GENERATOR_PLATFORM=ARM64")
-                        .arg("-DCMAKE_GENERATOR_INSTANCE_PLATFORM=ARM64")
-                        .arg("-DCMAKE_HOST_SYSTEM_PROCESSOR=ARM64")
-                        .arg("-DCMAKE_GENERATOR_TOOLSET=v143")
-                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET=v143")
-                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET_VERSION=14.3")
-                        .arg("-DCMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE=ARM64")
-                        .arg("-DCMAKE_CXX_FLAGS_RELEASE=/MD")
-                        .arg("-DCMAKE_CXX_FLAGS_DEBUG=/MDd")
-                        .arg("-DCMAKE_GENERATOR=Visual Studio 17 2022")
-                        .arg("-DCMAKE_SYSTEM_NAME=Windows")
-                        .arg("-DCMAKE_SYSTEM_VERSION=10")
-                        .arg("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
-                        .arg("-DCMAKE_C_FLAGS= -nologo -MD -Brepro")
-                        .arg("-DCMAKE_C_FLAGS_RELEASE= -nologo -MD -Brepro")
-                        .arg("-DCMAKE_ASM_FLAGS= -nologo -MD -Brepro")
-                        .arg("-DCMAKE_ASM_FLAGS_RELEASE= -nologo -MD -Brepro")
-                        .arg(format!("-DCMAKE_C_COMPILER={}", compiler_path))
-                        .arg(format!("-DCMAKE_CXX_COMPILER={}", compiler_path))
-                        .env("CC", &compiler_path)
-                        .env("CXX", &compiler_path)
-                        .env("CMAKE_C_COMPILER", &compiler_path)
-                        .env("CMAKE_CXX_COMPILER", &compiler_path)
-                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64;{}", 
-                            vs_path, msvc_version, env::var("PATH").unwrap_or_default()))
-                        .env("INCLUDE", format!("{}\\VC\\Tools\\MSVC\\{}\\include;{}", 
-                            vs_path, msvc_version, env::var("INCLUDE").unwrap_or_default()))
-                        .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
-                            vs_path, msvc_version, env::var("LIB").unwrap_or_default()))
-                        .status()
-                        .expect("Failed to run CMake");
-
-                    if !status.success() {
-                        panic!("CMake configuration failed");
-                    }
-
-                    // Run CMake build
-                    let status = std::process::Command::new("cmake")
-                        .arg("--build")
-                        .arg(".")
-                        .arg("--config")
-                        .arg("Release")
-                        .current_dir(&leptonica_dir)
-                        .status()
-                        .expect("Failed to run CMake build");
-
-                    if !status.success() {
-                        panic!("CMake build failed");
-                    }
-
-                    // Run CMake install
-                    let status = std::process::Command::new("cmake")
-                        .arg("--install")
-                        .arg(".")
-                        .arg("--config")
-                        .arg("Release")
-                        .current_dir(&leptonica_dir)
-                        .status()
-                        .expect("Failed to run CMake install");
-
-                    if !status.success() {
-                        panic!("CMake install failed");
-                    }
-
-                    // Skip the cmake crate's build step
-                    return;
-                } else {
-                    leptonica_config
-                        .generator("Visual Studio 17 2022")
-                        .define("CMAKE_GENERATOR_PLATFORM", "x64")
-                        .define("CMAKE_VS_PLATFORM_NAME", "x64")
-                        .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
-                        .define("CMAKE_SYSTEM_NAME", "Windows")
-                        .define("CMAKE_SYSTEM_VERSION", "10");
                 }
+            }
+        } else {
+            build_or_use_cached(
+                "leptonica",
+                &leptonica_cache_dir,
+                &leptonica_install_dir,
+                || {
+                    let mut leptonica_config = Config::new(&leptonica_dir);
 
-                leptonica_config
-                    .define("CMAKE_BUILD_TYPE", "Release")
-                    .define("BUILD_PROG", "OFF")
-                    .define("BUILD_SHARED_LIBS", "OFF")
-                    .define("ENABLE_ZLIB", "OFF")
-                    .define("ENABLE_PNG", "OFF")
-                    .define("ENABLE_JPEG", "OFF")
-                    .define("ENABLE_TIFF", "OFF")
-                    .define("ENABLE_WEBP", "OFF")
-                    .define("ENABLE_OPENJPEG", "OFF")
-                    .define("ENABLE_GIF", "OFF")
-                    .define("NO_CONSOLE_IO", "ON")
-                    .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
-                    .define("MINIMUM_SEVERITY", "L_SEVERITY_NONE")
-                    .define("SW_BUILD", "OFF")
-                    .define("HAVE_LIBZ", "0")
-                    .define("ENABLE_LTO", "OFF")
-                    .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir)
-                    .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
-                    .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
+                    let leptonica_src_dir = leptonica_dir.join("src");
+                    let environ_h_path = leptonica_src_dir.join("environ.h");
+                    let environ_h = std::fs::read_to_string(&environ_h_path)
+                        .expect("Failed to read environ.h")
+                        .replace(
+                            "#define  HAVE_LIBZ          1",
+                            "#define  HAVE_LIBZ          0",
+                        )
+                        .replace(
+                            "#ifdef  NO_CONSOLE_IO",
+                            "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO",
+                        );
+                    std::fs::write(environ_h_path, environ_h).expect("Failed to write environ.h");
 
-                // Add SIMD-specific configuration only for x64
-                #[cfg(not(target_arch = "aarch64"))]
-                {
+                    let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
+                    let makefile_static = std::fs::read_to_string(&makefile_static_path)
+                        .expect("Failed to read makefile.static")
+                        .replace(
+                            "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
+                            "ALL_LIBS =	$(LEPTLIB) -lm",
+                        );
+                    std::fs::write(makefile_static_path, makefile_static)
+                        .expect("Failed to write makefile.static");
+
+                    if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                        leptonica_config
+                            .env("CC", "sccache cc")
+                            .env("CXX", "sccache c++");
+                    } else {
+                        leptonica_config
+                            .generator("Visual Studio 17 2022")
+                            .define("CMAKE_GENERATOR_PLATFORM", "x64")
+                            .define("CMAKE_VS_PLATFORM_NAME", "x64")
+                            .define("CMAKE_SYSTEM_PROCESSOR", "AMD64")
+                            .define("CMAKE_SYSTEM_NAME", "Windows")
+                            .define("CMAKE_SYSTEM_VERSION", "10");
+                    }
+
                     leptonica_config
-                        .define("HAVE_AVX2", "1")
-                        .define("HAVE_FMA", "1")
-                        .define("HAVE_SSE4_1", "1")
-                        .define("HAVE_SSE4_2", "1")
-                        .define("HAVE_SSSE3", "1")
-                        .define("HAVE_SSE3", "1")
-                        .define("HAVE_SSE2", "1")
-                        .define("HAVE_SSE", "1")
-                        .define("HAVE_MMX", "1");
-                }
+                        .define("CMAKE_BUILD_TYPE", "Release")
+                        .define("BUILD_PROG", "OFF")
+                        .define("BUILD_SHARED_LIBS", "OFF")
+                        .define("ENABLE_ZLIB", "OFF")
+                        .define("ENABLE_PNG", "OFF")
+                        .define("ENABLE_JPEG", "OFF")
+                        .define("ENABLE_TIFF", "OFF")
+                        .define("ENABLE_WEBP", "OFF")
+                        .define("ENABLE_OPENJPEG", "OFF")
+                        .define("ENABLE_GIF", "OFF")
+                        .define("NO_CONSOLE_IO", "ON")
+                        .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
+                        .define("MINIMUM_SEVERITY", "L_SEVERITY_NONE")
+                        .define("SW_BUILD", "OFF")
+                        .define("HAVE_LIBZ", "0")
+                        .define("ENABLE_LTO", "OFF")
+                        .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir)
+                        .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3");
 
-                for (key, value) in &additional_defines {
-                    leptonica_config.define(key, value);
-                }
+                    // Add SIMD-specific configuration only for x64
+                    #[cfg(not(target_arch = "aarch64"))]
+                    {
+                        leptonica_config
+                            .define("HAVE_AVX2", "1")
+                            .define("HAVE_FMA", "1")
+                            .define("HAVE_SSE4_1", "1")
+                            .define("HAVE_SSE4_2", "1")
+                            .define("HAVE_SSSE3", "1")
+                            .define("HAVE_SSE3", "1")
+                            .define("HAVE_SSE2", "1")
+                            .define("HAVE_SSE", "1")
+                            .define("HAVE_MMX", "1");
+                    }
 
-                leptonica_config.build();
+                    for (key, value) in &additional_defines {
+                        leptonica_config.define(key, value);
+                    }
 
-                // --- BEGIN: Ensure generic leptonica.lib exists on Windows ---
-                #[cfg(target_os = "windows")]
-                {
-                    let lib_dir = leptonica_install_dir.join("lib");
-                    if let Ok(entries) = fs::read_dir(&lib_dir) {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
-                                if fname.starts_with("leptonica-") && fname.ends_with(".lib") {
-                                    let generic = lib_dir.join("leptonica.lib");
-                                    if !generic.exists() {
-                                        let _ = fs::copy(&path, &generic);
-                                        println!("cargo:warning=Copied {:?} to leptonica.lib", path);
+                    leptonica_config.build();
+
+                    // --- BEGIN: Ensure generic leptonica.lib exists on Windows ---
+                    #[cfg(target_os = "windows")]
+                    {
+                        let lib_dir = leptonica_install_dir.join("lib");
+                        if let Ok(entries) = fs::read_dir(&lib_dir) {
+                            for entry in entries.flatten() {
+                                let path = entry.path();
+                                if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                                    if fname.starts_with("leptonica-") && fname.ends_with(".lib") {
+                                        let generic = lib_dir.join("leptonica.lib");
+                                        if !generic.exists() {
+                                            let _ = fs::copy(&path, &generic);
+                                            println!("cargo:warning=Copied {:?} to leptonica.lib", path);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                // --- END: Ensure generic leptonica.lib exists on Windows ---
-            },
-        );
+                    // --- END: Ensure generic leptonica.lib exists on Windows ---
+                },
+            );
+        }
 
         let leptonica_include_dir = leptonica_install_dir.join("include");
         let leptonica_lib_dir = leptonica_install_dir.join("lib");
