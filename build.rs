@@ -349,6 +349,12 @@ mod build_tesseract {
             additional_defines.push(("_M_AMD64".to_string(), "1".to_string()));
             additional_defines.push(("CMAKE_VS_PLATFORM_NAME".to_string(), "x64".to_string()));
             additional_defines.push(("CMAKE_GENERATOR_PLATFORM".to_string(), "x64".to_string()));
+            // Add CMake generator settings
+            additional_defines.push(("CMAKE_GENERATOR".to_string(), "Visual Studio 17 2022".to_string()));
+            additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "x64".to_string()));
+            additional_defines.push(("CMAKE_SYSTEM_PROCESSOR".to_string(), "AMD64".to_string()));
+            additional_defines.push(("CMAKE_SYSTEM_NAME".to_string(), "Windows".to_string()));
+            additional_defines.push(("CMAKE_SYSTEM_VERSION".to_string(), "10".to_string()));
         }
 
         // Common flags and defines for all platforms
