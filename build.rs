@@ -121,6 +121,27 @@ mod build_tesseract {
                 }
 
                 leptonica_config.build();
+
+                // --- BEGIN: Ensure generic leptonica.lib exists on Windows ---
+                #[cfg(target_os = "windows")]
+                {
+                    let lib_dir = leptonica_install_dir.join("lib");
+                    if let Ok(entries) = fs::read_dir(&lib_dir) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                                if fname.starts_with("leptonica-") && fname.ends_with(".lib") {
+                                    let generic = lib_dir.join("leptonica.lib");
+                                    if !generic.exists() {
+                                        let _ = fs::copy(&path, &generic);
+                                        println!("cargo:warning=Copied {:?} to leptonica.lib", path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // --- END: Ensure generic leptonica.lib exists on Windows ---
             },
         );
 
