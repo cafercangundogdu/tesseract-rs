@@ -148,6 +148,11 @@ mod build_tesseract {
                         .define("CMAKE_C_COMPILER", &compiler_path)
                         .define("CMAKE_CXX_COMPILER", &compiler_path)
                         .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64")
+                        .define("CMAKE_VS_PLATFORM_TOOLSET", "v143")
+                        .define("CMAKE_VS_PLATFORM_TOOLSET_VERSION", "14.3")
+                        .define("CMAKE_HOST_SYSTEM_PROCESSOR", "ARM64")
+                        .define("CMAKE_HOST_SYSTEM_NAME", "Windows")
+                        .define("CMAKE_HOST_SYSTEM_VERSION", "10")
                         .env("CC", &compiler_path)
                         .env("CXX", &compiler_path)
                         .env("CMAKE_C_COMPILER", &compiler_path)
@@ -158,6 +163,9 @@ mod build_tesseract {
                             vs_path, msvc_version, env::var("INCLUDE").unwrap_or_default()))
                         .env("LIB", format!("{}\\VC\\Tools\\MSVC\\{}\\lib\\ARM64;{}", 
                             vs_path, msvc_version, env::var("LIB").unwrap_or_default()));
+
+                    // Remove the -Thost=x64 flag from the CMake command
+                    leptonica_config.define("CMAKE_GENERATOR_TOOLSET", "v143");
                 } else {
                     leptonica_config
                         .generator("Visual Studio 17 2022")
@@ -445,6 +453,8 @@ mod build_tesseract {
                 additional_defines.push(("CMAKE_VS_PLATFORM_NAME".to_string(), "ARM64".to_string()));
                 additional_defines.push(("CMAKE_GENERATOR_PLATFORM".to_string(), "ARM64".to_string()));
                 additional_defines.push(("CMAKE_GENERATOR_INSTANCE_PLATFORM".to_string(), "ARM64".to_string()));
+                additional_defines.push(("CMAKE_HOST_SYSTEM_PROCESSOR".to_string(), "ARM64".to_string()));
+                additional_defines.push(("CMAKE_GENERATOR_TOOLSET".to_string(), "v143".to_string()));
             } else {
                 // x64-specific flags
                 cmake_cxx_flags.push_str("/arch:AVX2 ");
