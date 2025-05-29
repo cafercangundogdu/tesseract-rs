@@ -239,6 +239,9 @@ mod build_tesseract {
                     if !status.success() {
                         panic!("CMake install failed");
                     }
+
+                    // Skip the cmake crate's build step
+                    return;
                 } else {
                     leptonica_config
                         .generator("Visual Studio 17 2022")
