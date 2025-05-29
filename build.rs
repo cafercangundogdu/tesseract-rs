@@ -97,12 +97,16 @@ mod build_tesseract {
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
                 } else if cfg!(target_arch = "aarch64") {
-                    // Set ARM64 compiler paths
+                    // Set ARM64 compiler paths with full paths
+                    let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Community";
+                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64\\cl.exe", vs_path);
+                    
                     leptonica_config
-                        .env("CC", "cl.exe")
-                        .env("CXX", "cl.exe")
-                        .env("CMAKE_C_COMPILER", "cl.exe")
-                        .env("CMAKE_CXX_COMPILER", "cl.exe");
+                        .env("CC", &compiler_path)
+                        .env("CXX", &compiler_path)
+                        .env("CMAKE_C_COMPILER", &compiler_path)
+                        .env("CMAKE_CXX_COMPILER", &compiler_path)
+                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64;{}", vs_path, env::var("PATH").unwrap_or_default()));
                 }
 
                 // Set architecture-specific configuration
@@ -114,8 +118,8 @@ mod build_tesseract {
                         .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
                         .define("CMAKE_SYSTEM_NAME", "Windows")
                         .define("CMAKE_SYSTEM_VERSION", "10")
-                        .define("CMAKE_C_COMPILER", "cl.exe")
-                        .define("CMAKE_CXX_COMPILER", "cl.exe")
+                        .define("CMAKE_C_COMPILER", &compiler_path)
+                        .define("CMAKE_CXX_COMPILER", &compiler_path)
                         .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64");
                 } else {
                     leptonica_config
@@ -216,12 +220,16 @@ mod build_tesseract {
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
                 } else if cfg!(target_arch = "aarch64") {
-                    // Set ARM64 compiler paths
+                    // Set ARM64 compiler paths with full paths
+                    let vs_path = r"C:\Program Files\Microsoft Visual Studio\2022\Community";
+                    let compiler_path = format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64\\cl.exe", vs_path);
+                    
                     tesseract_config
-                        .env("CC", "cl.exe")
-                        .env("CXX", "cl.exe")
-                        .env("CMAKE_C_COMPILER", "cl.exe")
-                        .env("CMAKE_CXX_COMPILER", "cl.exe");
+                        .env("CC", &compiler_path)
+                        .env("CXX", &compiler_path)
+                        .env("CMAKE_C_COMPILER", &compiler_path)
+                        .env("CMAKE_CXX_COMPILER", &compiler_path)
+                        .env("PATH", format!("{}\\VC\\Tools\\MSVC\\14.38.33130\\bin\\HostARM64\\ARM64;{}", vs_path, env::var("PATH").unwrap_or_default()));
                 }
 
                 // Set architecture-specific configuration
@@ -233,8 +241,8 @@ mod build_tesseract {
                         .define("CMAKE_SYSTEM_PROCESSOR", "ARM64")
                         .define("CMAKE_SYSTEM_NAME", "Windows")
                         .define("CMAKE_SYSTEM_VERSION", "10")
-                        .define("CMAKE_C_COMPILER", "cl.exe")
-                        .define("CMAKE_CXX_COMPILER", "cl.exe")
+                        .define("CMAKE_C_COMPILER", &compiler_path)
+                        .define("CMAKE_CXX_COMPILER", &compiler_path)
                         .define("CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE", "ARM64");
                 } else {
                     tesseract_config
