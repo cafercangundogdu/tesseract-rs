@@ -95,8 +95,12 @@ mod build_tesseract {
             let compiler_path = format!("{}\\VC\\Tools\\MSVC\\{}\\bin\\HostARM64\\ARM64\\cl.exe", 
                 vs_path, msvc_version);
             
+            // Convert Windows path to CMake-compatible path
+            let cmake_compiler_path = compiler_path.replace("\\", "/");
+            
             println!("cargo:warning=Using MSVC version: {}", msvc_version);
             println!("cargo:warning=Compiler path: {}", compiler_path);
+            println!("cargo:warning=CMake compiler path: {}", cmake_compiler_path);
             
             // Verify compiler exists
             if !std::path::Path::new(&compiler_path).exists() {
@@ -158,8 +162,8 @@ mod build_tesseract {
                 .arg("-DCMAKE_C_FLAGS_RELEASE= -nologo -MD -Brepro")
                 .arg("-DCMAKE_ASM_FLAGS= -nologo -MD -Brepro")
                 .arg("-DCMAKE_ASM_FLAGS_RELEASE= -nologo -MD -Brepro")
-                .arg(format!("-DCMAKE_C_COMPILER={}", compiler_path))
-                .arg(format!("-DCMAKE_CXX_COMPILER={}", compiler_path))
+                .arg(format!("-DCMAKE_C_COMPILER={}", cmake_compiler_path))
+                .arg(format!("-DCMAKE_CXX_COMPILER={}", cmake_compiler_path))
                 .env("CC", &compiler_path)
                 .env("CXX", &compiler_path)
                 .env("CMAKE_C_COMPILER", &compiler_path)
