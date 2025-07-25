@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 #[cfg(feature = "build-tesseract")]
 mod build_tesseract {
     use cmake::Config;
@@ -124,7 +126,10 @@ mod build_tesseract {
                     if let Ok(_vs_install_dir) = env::var("VSINSTALLDIR") {
                         leptonica_config.generator("NMake Makefiles");
                     }
-                } else if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                }
+                
+                // Only use sccache if not in CI
+                if env::var("CI").is_err() && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
                     leptonica_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
@@ -188,7 +193,10 @@ mod build_tesseract {
                     if let Ok(_vs_install_dir) = env::var("VSINSTALLDIR") {
                         tesseract_config.generator("NMake Makefiles");
                     }
-                } else if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                }
+                
+                // Only use sccache if not in CI
+                if env::var("CI").is_err() && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
                     tesseract_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
