@@ -1,0 +1,13 @@
+{
+  "name": "tesseract-rs",
+  "version": "0.1.19",
+  "private": true,
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.7"
+  },
+  "scripts": {
+    "prepare": "husky install"
+  }
+}

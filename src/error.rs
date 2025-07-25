@@ -44,3 +44,38 @@ pub enum TesseractError {
 
 /// Result type for Tesseract operations.
 pub type Result<T> = std::result::Result<T, TesseractError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_display() {
+        let error = TesseractError::InitError;
+        assert_eq!(error.to_string(), "Failed to initialize Tesseract");
+        
+        let error = TesseractError::SetImageError;
+        assert_eq!(error.to_string(), "Failed to set image");
+        
+        let error = TesseractError::OcrError;
+        assert_eq!(error.to_string(), "OCR operation failed");
+    }
+
+    #[test]
+    fn test_utf8_error_conversion() {
+        let invalid_utf8 = vec![0xFF, 0xFE];
+        let utf8_error = std::str::from_utf8(&invalid_utf8).unwrap_err();
+        let tess_error: TesseractError = utf8_error.into();
+        
+        match tess_error {
+            TesseractError::Utf8Error(_) => {},
+            _ => panic!("Expected Utf8Error variant"),
+        }
+    }
+
+    #[test]
+    fn test_error_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<TesseractError>();
+    }
+}

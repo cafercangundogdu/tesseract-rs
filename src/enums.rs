@@ -195,3 +195,76 @@ impl TessTextlineOrder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_page_seg_mode_from_int() {
+        assert_eq!(TessPageSegMode::from_int(0), TessPageSegMode::PSM_OSD_ONLY);
+        assert_eq!(TessPageSegMode::from_int(3), TessPageSegMode::PSM_AUTO);
+        assert_eq!(TessPageSegMode::from_int(10), TessPageSegMode::PSM_SINGLE_CHAR);
+        assert_eq!(TessPageSegMode::from_int(999), TessPageSegMode::PSM_AUTO); // default
+    }
+
+    #[test]
+    fn test_page_seg_mode_conversion() {
+        let mode = TessPageSegMode::PSM_SINGLE_LINE;
+        assert_eq!(mode as i32, 7);
+    }
+
+    #[test]
+    fn test_page_iterator_level_from_int() {
+        assert_eq!(TessPageIteratorLevel::from_int(0), TessPageIteratorLevel::RIL_BLOCK);
+        assert_eq!(TessPageIteratorLevel::from_int(3), TessPageIteratorLevel::RIL_WORD);
+        assert_eq!(TessPageIteratorLevel::from_int(-1), TessPageIteratorLevel::RIL_BLOCK); // default
+    }
+
+    #[test]
+    fn test_poly_block_type_from_int() {
+        assert_eq!(TessPolyBlockType::from_int(1), TessPolyBlockType::PT_FLOWING_TEXT);
+        assert_eq!(TessPolyBlockType::from_int(6), TessPolyBlockType::PT_TABLE);
+        assert_eq!(TessPolyBlockType::from_int(100), TessPolyBlockType::PT_UNKNOWN); // default
+    }
+
+    #[test]
+    fn test_orientation_from_int() {
+        assert_eq!(TessOrientation::from_int(0), TessOrientation::ORIENTATION_PAGE_UP);
+        assert_eq!(TessOrientation::from_int(2), TessOrientation::ORIENTATION_PAGE_DOWN);
+        assert_eq!(TessOrientation::from_int(5), TessOrientation::ORIENTATION_PAGE_UP); // default
+    }
+
+    #[test]
+    fn test_paragraph_justification_from_int() {
+        assert_eq!(TessParagraphJustification::from_int(1), TessParagraphJustification::JUSTIFICATION_LEFT);
+        assert_eq!(TessParagraphJustification::from_int(3), TessParagraphJustification::JUSTIFICATION_RIGHT);
+        assert_eq!(TessParagraphJustification::from_int(-1), TessParagraphJustification::JUSTIFICATION_UNKNOWN);
+    }
+
+    #[test]
+    fn test_writing_direction_from_int() {
+        assert_eq!(TessWritingDirection::from_int(0), TessWritingDirection::WRITING_DIRECTION_LEFT_TO_RIGHT);
+        assert_eq!(TessWritingDirection::from_int(1), TessWritingDirection::WRITING_DIRECTION_RIGHT_TO_LEFT);
+        assert_eq!(TessWritingDirection::from_int(10), TessWritingDirection::WRITING_DIRECTION_LEFT_TO_RIGHT);
+    }
+
+    #[test]
+    fn test_textline_order_from_int() {
+        assert_eq!(TessTextlineOrder::from_int(0), TessTextlineOrder::TEXTLINE_ORDER_LEFT_TO_RIGHT);
+        assert_eq!(TessTextlineOrder::from_int(2), TessTextlineOrder::TEXTLINE_ORDER_TOP_TO_BOTTOM);
+        assert_eq!(TessTextlineOrder::from_int(99), TessTextlineOrder::TEXTLINE_ORDER_LEFT_TO_RIGHT);
+    }
+
+    #[test]
+    fn test_enums_are_copy() {
+        fn assert_copy<T: Copy>() {}
+        assert_copy::<TessPageSegMode>();
+        assert_copy::<TessPageIteratorLevel>();
+        assert_copy::<TessPolyBlockType>();
+        assert_copy::<TessOrientation>();
+        assert_copy::<TessParagraphJustification>();
+        assert_copy::<TessWritingDirection>();
+        assert_copy::<TessTextlineOrder>();
+    }
+}
