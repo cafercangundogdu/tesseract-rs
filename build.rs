@@ -127,9 +127,11 @@ mod build_tesseract {
                         leptonica_config.generator("NMake Makefiles");
                     }
                 }
-                
+
                 // Only use sccache if not in CI
-                if env::var("CI").is_err() && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                if env::var("CI").is_err()
+                    && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache"
+                {
                     leptonica_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
@@ -194,9 +196,11 @@ mod build_tesseract {
                         tesseract_config.generator("NMake Makefiles");
                     }
                 }
-                
+
                 // Only use sccache if not in CI
-                if env::var("CI").is_err() && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                if env::var("CI").is_err()
+                    && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache"
+                {
                     tesseract_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");

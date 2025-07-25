@@ -95,12 +95,15 @@ jobs:
     - name: Build
       run: cargo build --verbose
       shell: bash
+      env:
+        RUSTC_WRAPPER: ""
       
     - name: Run tests
       run: cargo test --verbose
       shell: bash
       env:
         RUST_LOG: debug
+        RUSTC_WRAPPER: ""
     
   coverage:
     runs-on: ubuntu-latest
