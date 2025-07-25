@@ -26,16 +26,16 @@ fn get_default_tessdata_dir() -> PathBuf {
 
 fn benchmark_simple_ocr(c: &mut Criterion) {
     let tessdata_dir = get_default_tessdata_dir();
-    
+
     c.bench_function("simple_ocr", |b| {
         let api = TesseractAPI::new();
         api.init(tessdata_dir.to_str().unwrap(), "eng").unwrap();
-        
+
         // Create a simple test image (24x24 white image with a black digit)
         let width = 24;
         let height = 24;
         let mut image_data = vec![255u8; width * height];
-        
+
         // Draw a simple pattern
         for y in 8..16 {
             for x in 8..16 {
@@ -44,7 +44,7 @@ fn benchmark_simple_ocr(c: &mut Criterion) {
                 }
             }
         }
-        
+
         b.iter(|| {
             api.set_image(
                 black_box(&image_data),
@@ -52,8 +52,9 @@ fn benchmark_simple_ocr(c: &mut Criterion) {
                 black_box(height as i32),
                 black_box(1),
                 black_box(width as i32),
-            ).unwrap();
-            
+            )
+            .unwrap();
+
             let _text = api.get_utf8_text().unwrap();
         });
     });
@@ -61,27 +62,29 @@ fn benchmark_simple_ocr(c: &mut Criterion) {
 
 fn benchmark_with_variables(c: &mut Criterion) {
     let tessdata_dir = get_default_tessdata_dir();
-    
+
     c.bench_function("ocr_with_variables", |b| {
         let api = TesseractAPI::new();
         api.init(tessdata_dir.to_str().unwrap(), "eng").unwrap();
-        
+
         let width = 24;
         let height = 24;
         let image_data = vec![255u8; width * height];
-        
+
         b.iter(|| {
-            api.set_variable("tessedit_char_whitelist", "0123456789").unwrap();
+            api.set_variable("tessedit_char_whitelist", "0123456789")
+                .unwrap();
             api.set_variable("tessedit_pageseg_mode", "10").unwrap();
-            
+
             api.set_image(
                 black_box(&image_data),
                 black_box(width as i32),
                 black_box(height as i32),
                 black_box(1),
                 black_box(width as i32),
-            ).unwrap();
-            
+            )
+            .unwrap();
+
             let _text = api.get_utf8_text().unwrap();
         });
     });
@@ -97,7 +100,7 @@ fn benchmark_api_creation(c: &mut Criterion) {
 
 fn benchmark_api_clone(c: &mut Criterion) {
     let api = TesseractAPI::new();
-    
+
     c.bench_function("api_clone", |b| {
         b.iter(|| {
             let _cloned = black_box(api.clone());

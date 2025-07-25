@@ -10,11 +10,12 @@ mod build_tesseract {
         "https://github.com/DanBloomberg/leptonica/archive/refs/tags/1.84.1.zip";
     const TESSERACT_URL: &str =
         "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.3.4.zip";
-    
+
     fn get_custom_out_dir() -> PathBuf {
         if cfg!(target_os = "macos") {
             let home_dir = env::var("HOME").unwrap_or_else(|_| {
-                env::var("USER").map(|user| format!("/Users/{}", user))
+                env::var("USER")
+                    .map(|user| format!("/Users/{}", user))
                     .expect("Neither HOME nor USER environment variable set")
             });
             PathBuf::from(home_dir)
@@ -23,7 +24,8 @@ mod build_tesseract {
                 .join("tesseract-rs")
         } else if cfg!(target_os = "linux") {
             let home_dir = env::var("HOME").unwrap_or_else(|_| {
-                env::var("USER").map(|user| format!("/home/{}", user))
+                env::var("USER")
+                    .map(|user| format!("/home/{}", user))
                     .expect("Neither HOME nor USER environment variable set")
             });
             PathBuf::from(home_dir).join(".tesseract-rs")
@@ -86,7 +88,7 @@ mod build_tesseract {
 
                 let leptonica_src_dir = leptonica_dir.join("src");
                 let environ_h_path = leptonica_src_dir.join("environ.h");
-                
+
                 // Only modify environ.h if it exists
                 if environ_h_path.exists() {
                     let environ_h = std::fs::read_to_string(&environ_h_path)
@@ -103,7 +105,7 @@ mod build_tesseract {
                 }
 
                 let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
-                
+
                 // Only modify makefile.static if it exists
                 if makefile_static_path.exists() {
                     let makefile_static = std::fs::read_to_string(&makefile_static_path)
@@ -145,7 +147,7 @@ mod build_tesseract {
                     .define("HAVE_LIBZ", "0")
                     .define("ENABLE_LTO", "OFF")
                     .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
-                
+
                 // Windows-specific defines
                 if cfg!(target_os = "windows") {
                     leptonica_config
@@ -305,8 +307,14 @@ mod build_tesseract {
             cmake_cxx_flags.push_str("/EHsc /MP /std:c++17 ");
             additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD /O2".to_string()));
             additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd /Od".to_string()));
-            additional_defines.push(("CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS".to_string(), "ON".to_string()));
-            additional_defines.push(("CMAKE_MSVC_RUNTIME_LIBRARY".to_string(), "MultiThreadedDLL".to_string()));
+            additional_defines.push((
+                "CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS".to_string(),
+                "ON".to_string(),
+            ));
+            additional_defines.push((
+                "CMAKE_MSVC_RUNTIME_LIBRARY".to_string(),
+                "MultiThreadedDLL".to_string(),
+            ));
         }
 
         // Common flags and defines for all platforms
@@ -359,20 +367,24 @@ mod build_tesseract {
             .timeout(std::time::Duration::from_secs(300))
             .build()
             .expect("Failed to create HTTP client");
-        
+
         println!("cargo:warning=Downloading {} from {}", name, url);
         let mut response = client.get(url).send().expect("Failed to download archive");
-        
+
         if !response.status().is_success() {
             panic!("Failed to download {}: HTTP {}", name, response.status());
         }
-        
+
         let mut content = Vec::new();
         response
             .copy_to(&mut content)
             .expect("Failed to read archive content");
-        
-        println!("cargo:warning=Downloaded {} bytes for {}", content.len(), name);
+
+        println!(
+            "cargo:warning=Downloaded {} bytes for {}",
+            content.len(),
+            name
+        );
 
         let temp_file = target_dir.join(format!("{}.zip", name));
         fs::write(&temp_file, content).expect("Failed to write archive to file");
@@ -481,7 +493,7 @@ mod build_tesseract {
 
         let cached_path = cache_dir.join(&lib_name);
         let out_path = install_dir.join("lib").join(&lib_name);
-        
+
         // For Windows, also check for alternative library names
         let alt_lib_names = if cfg!(target_os = "windows") {
             match name {
@@ -517,7 +529,10 @@ mod build_tesseract {
                 for alt_name in &alt_lib_names {
                     let alt_path = install_dir.join("lib").join(alt_name);
                     if alt_path.exists() {
-                        println!("cargo:warning=Found library at alternative path: {}", alt_path.display());
+                        println!(
+                            "cargo:warning=Found library at alternative path: {}",
+                            alt_path.display()
+                        );
                         if let Err(e) = fs::copy(&alt_path, &out_path) {
                             println!("cargo:warning=Failed to copy library: {}", e);
                         } else {
@@ -529,13 +544,16 @@ mod build_tesseract {
                         break;
                     }
                 }
-                
+
                 if !found {
                     println!(
                         "cargo:warning=Expected library not found at: {}",
                         out_path.display()
                     );
-                    println!("cargo:warning=Also checked alternative names: {:?}", alt_lib_names);
+                    println!(
+                        "cargo:warning=Also checked alternative names: {:?}",
+                        alt_lib_names
+                    );
                 }
             }
         }
