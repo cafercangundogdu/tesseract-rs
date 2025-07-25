@@ -73,13 +73,19 @@ The footer should contain any information about Breaking Changes and is also the
 
 ## Setting Up Commit Hooks
 
-We use Husky to enforce commit message standards. To set up the hooks:
+We use Husky to enforce code quality and commit message standards. To set up the hooks:
 
 1. Install Node.js if you haven't already
-2. Run `npm install` in the project root
-3. The commit-msg hook will be automatically installed
+2. Run `./setup-hooks.sh` or `npm install` in the project root
+3. The pre-commit and commit-msg hooks will be automatically installed
 
-Now, when you make a commit, it will be validated against our commit message format.
+The hooks will:
+- **Pre-commit**: Check code formatting (rustfmt) and run clippy before allowing commits
+- **Commit-msg**: Validate commit messages against our conventional commit format
+
+If pre-commit checks fail:
+- Run `cargo fmt` to fix formatting issues
+- Run `cargo clippy` to see warnings and fix them
 
 ## Pull Request Process
 

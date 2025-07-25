@@ -1,0 +1,26 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "Running pre-commit checks..."
+
+# Check if cargo is available
+if ! command -v cargo &> /dev/null; then
+    echo "❌ Cargo is not installed. Please install Rust."
+    exit 1
+fi
+
+# Run rustfmt check
+echo "🔍 Checking code formatting..."
+if ! cargo fmt -- --check; then
+    echo "❌ Code formatting issues found. Please run 'cargo fmt' to fix them."
+    exit 1
+fi
+
+# Run clippy
+echo "🔍 Running clippy..."
+if ! cargo clippy -- -D warnings; then
+    echo "❌ Clippy warnings found. Please fix them before committing."
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"

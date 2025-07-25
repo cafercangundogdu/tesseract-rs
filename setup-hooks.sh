@@ -29,6 +29,7 @@ npx husky install
 
 # Make hooks executable
 chmod +x .husky/commit-msg
+chmod +x .husky/pre-commit
 
 echo "✅ Git hooks installed successfully!"
 echo ""
