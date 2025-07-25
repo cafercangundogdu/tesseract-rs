@@ -1,4 +1,10 @@
 #![cfg_attr(not(feature = "build-tesseract"), allow(unused_variables, dead_code))]
+#![allow(clippy::arc_with_non_send_sync)]
+#![allow(clippy::missing_transmute_annotations)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+#![allow(clippy::cmp_null)]
 
 //! # tesseract-rs
 //!

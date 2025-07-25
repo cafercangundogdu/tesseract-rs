@@ -319,9 +319,22 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Cafer Can Gündoğdu](https://github.com/cafercangundogdu)
 
-## Contribution
+## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Quick Start for Contributors
+
+1. Fork and clone the repository
+2. Install development dependencies:
+   ```bash
+   ./setup-hooks.sh
+   ```
+3. Make your changes following our commit message format
+4. Run tests: `cargo test`
+5. Submit a Pull Request
+
+Our commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
 ## Acknowledgements
 
