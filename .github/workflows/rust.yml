@@ -24,6 +24,18 @@ jobs:
       with:
         components: rustfmt, clippy
     
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.cargo/bin
+          target
+        key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-lint-
+    
     - name: Check formatting
       run: cargo fmt -- --check
     
@@ -33,7 +45,10 @@ jobs:
         RUSTC_WRAPPER: ""
     
     - name: Install cargo-audit
-      run: cargo install cargo-audit
+      run: |
+        if ! command -v cargo-audit &> /dev/null; then
+          cargo install cargo-audit
+        fi
       env:
         RUSTC_WRAPPER: ""
     
@@ -74,19 +89,28 @@ jobs:
     # - name: Install sccache
     #   run: cargo install sccache
     
-    - name: Cache dependencies
+    - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-          ~/Library/Application Support/tesseract-rs
-          ~/.tesseract-rs
-          ~/AppData/Roaming/tesseract-rs
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
+    
+    - name: Cache build artifacts
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/Library/Application Support/tesseract-rs
+          ~/.tesseract-rs
+          ~/AppData/Roaming/tesseract-rs
+          C:\Users\runneradmin\AppData\Roaming\tesseract-rs
+        key: ${{ runner.os }}-tesseract-build-${{ hashFiles('build.rs') }}
+        restore-keys: |
+          ${{ runner.os }}-tesseract-build-
     
     - name: Setup MSVC environment (Windows)
       if: matrix.os == 'windows-latest'
@@ -141,13 +165,37 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
     
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.cargo/bin
+          target
+        key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-coverage-
+    
+    - name: Cache build artifacts
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.tesseract-rs
+        key: ${{ runner.os }}-tesseract-coverage-${{ hashFiles('build.rs') }}
+        restore-keys: |
+          ${{ runner.os }}-tesseract-coverage-
+    
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake build-essential
     
     - name: Install tarpaulin
-      run: cargo install cargo-tarpaulin
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin
+        fi
     
     - name: Generate coverage report
       run: cargo tarpaulin --out xml --ignore-tests --timeout 300
