@@ -572,10 +572,8 @@ mod build_tesseract {
                 // List files in lib directory for debugging
                 if let Ok(entries) = fs::read_dir(install_dir.join("lib")) {
                     println!("cargo:warning=Files in lib directory:");
-                    for entry in entries {
-                        if let Ok(entry) = entry {
-                            println!("cargo:warning=  - {}", entry.file_name().to_string_lossy());
-                        }
+                    for entry in entries.flatten() {
+                        println!("cargo:warning=  - {}", entry.file_name().to_string_lossy());
                     }
                 }
             }
