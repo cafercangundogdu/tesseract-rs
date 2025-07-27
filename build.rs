@@ -500,16 +500,16 @@ mod build_tesseract {
             match name {
                 "leptonica" => vec![
                     "leptonica.lib".to_string(),
-                    "libleptonica.lib".to_string(), 
+                    "libleptonica.lib".to_string(),
                     "leptonica-static.lib".to_string(),
-                    "leptonica-1.84.1.lib".to_string()
+                    "leptonica-1.84.1.lib".to_string(),
                 ],
                 "tesseract" => vec![
                     "tesseract.lib".to_string(),
                     "libtesseract.lib".to_string(),
                     "tesseract-static.lib".to_string(),
                     "tesseract53.lib".to_string(),
-                    "tesseract54.lib".to_string()
+                    "tesseract54.lib".to_string(),
                 ],
                 _ => vec![format!("{}.lib", name)],
             }
@@ -545,12 +545,15 @@ mod build_tesseract {
                     break;
                 }
             }
-            
+
             if let Some(lib_path) = found_lib_path {
                 // Copy to expected location for caching
                 if !out_path.exists() {
                     if let Err(e) = fs::copy(&lib_path, &out_path) {
-                        println!("cargo:warning=Failed to copy library to standard location: {}", e);
+                        println!(
+                            "cargo:warning=Failed to copy library to standard location: {}",
+                            e
+                        );
                     }
                 }
                 // Cache the library
@@ -560,8 +563,7 @@ mod build_tesseract {
             } else {
                 println!(
                     "cargo:warning=Library {} not found! Searched for: {:?}",
-                    name,
-                    possible_lib_names
+                    name, possible_lib_names
                 );
                 println!(
                     "cargo:warning=In directory: {}",
@@ -585,7 +587,7 @@ mod build_tesseract {
         );
 
         println!("cargo:rustc-link-lib=static={}", name);
-        
+
         // For Windows, try alternative names if primary fails
         if cfg!(target_os = "windows") && name == "leptonica" {
             println!("cargo:rustc-link-lib=static=leptonica-1.84.1");
