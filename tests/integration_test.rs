@@ -204,7 +204,9 @@ fn test_digit_recognition() {
 
     let text = api.get_utf8_text().expect("Failed to perform OCR");
     assert!(!text.is_empty());
-    assert!(text.chars().all(|c| c.is_ascii_digit() || c.is_whitespace()));
+    assert!(text
+        .chars()
+        .all(|c| c.is_ascii_digit() || c.is_whitespace()));
 }
 
 #[test]
