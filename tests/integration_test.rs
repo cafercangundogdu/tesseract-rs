@@ -204,7 +204,9 @@ fn test_digit_recognition() {
 
     let text = api.get_utf8_text().expect("Failed to perform OCR");
     assert!(!text.is_empty());
-    assert!(text.chars().all(|c| c.is_digit(10) || c.is_whitespace()));
+    assert!(text
+        .chars()
+        .all(|c| c.is_ascii_digit() || c.is_whitespace()));
 }
 
 #[test]
@@ -214,9 +216,7 @@ fn test_error_handling() {
     let init_result = api.init("/invalid/path", "eng");
     assert!(init_result.is_err());
 
-    if init_result.is_err() {
-        return;
-    }
+    if init_result.is_err() {}
 }
 
 #[test]
@@ -525,27 +525,27 @@ fn test_dynamic_image_setting() {
     for y in 4..19 {
         for x in 7..17 {
             // Top bar
-            if y == 4 && x >= 8 && x <= 15 {
+            if y == 4 && (8..=15).contains(&x) {
                 image_data[y * width + x] = 0;
             }
             // Top curve left side
-            if y >= 4 && y <= 10 && x == 7 {
+            if (4..=10).contains(&y) && x == 7 {
                 image_data[y * width + x] = 0;
             }
             // Top curve right side
-            if y >= 4 && y <= 11 && x == 16 {
+            if (4..=11).contains(&y) && x == 16 {
                 image_data[y * width + x] = 0;
             }
             // Middle bar
-            if y == 11 && x >= 8 && x <= 15 {
+            if y == 11 && (8..=15).contains(&x) {
                 image_data[y * width + x] = 0;
             }
             // Bottom right vertical line
-            if y >= 11 && y <= 18 && x == 16 {
+            if (11..=18).contains(&y) && x == 16 {
                 image_data[y * width + x] = 0;
             }
             // Bottom bar
-            if y == 18 && x >= 8 && x <= 15 {
+            if y == 18 && (8..=15).contains(&x) {
                 image_data[y * width + x] = 0;
             }
         }

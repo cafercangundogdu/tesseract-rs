@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 #[cfg(feature = "build-tesseract")]
 mod build_tesseract {
     use cmake::Config;
@@ -5,27 +7,43 @@ mod build_tesseract {
     use std::fs;
     use std::path::{Path, PathBuf};
 
+    // Use specific release versions for stability
     const LEPTONICA_URL: &str =
-        "https://github.com/DanBloomberg/leptonica/archive/refs/heads/master.zip";
+        "https://github.com/DanBloomberg/leptonica/archive/refs/tags/1.84.1.zip";
     const TESSERACT_URL: &str =
-        "https://github.com/tesseract-ocr/tesseract/archive/refs/heads/main.zip";
+        "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.3.4.zip";
 
-    pub fn build() {
-        let custom_out_dir = if cfg!(target_os = "macos") {
-            let home_dir = env::var("HOME").expect("HOME environment variable not set");
+    fn get_custom_out_dir() -> PathBuf {
+        if cfg!(target_os = "macos") {
+            let home_dir = env::var("HOME").unwrap_or_else(|_| {
+                env::var("USER")
+                    .map(|user| format!("/Users/{}", user))
+                    .expect("Neither HOME nor USER environment variable set")
+            });
             PathBuf::from(home_dir)
                 .join("Library")
                 .join("Application Support")
                 .join("tesseract-rs")
         } else if cfg!(target_os = "linux") {
-            let home_dir = env::var("HOME").expect("HOME environment variable not set");
+            let home_dir = env::var("HOME").unwrap_or_else(|_| {
+                env::var("USER")
+                    .map(|user| format!("/home/{}", user))
+                    .expect("Neither HOME nor USER environment variable set")
+            });
             PathBuf::from(home_dir).join(".tesseract-rs")
         } else if cfg!(target_os = "windows") {
-            PathBuf::from(env::var("APPDATA").expect("APPDATA environment variable not set"))
+            env::var("APPDATA")
+                .or_else(|_| env::var("USERPROFILE").map(|p| format!("{}\\AppData\\Roaming", p)))
+                .map(PathBuf::from)
+                .expect("Neither APPDATA nor USERPROFILE environment variable set")
                 .join("tesseract-rs")
         } else {
             panic!("Unsupported operating system");
-        };
+        }
+    }
+
+    pub fn build() {
+        let custom_out_dir = get_custom_out_dir();
         std::fs::create_dir_all(&custom_out_dir).expect("Failed to create custom out directory");
 
         println!("cargo:warning=custom_out_dir: {:?}", custom_out_dir);
@@ -43,6 +61,7 @@ mod build_tesseract {
         let third_party_dir = project_dir.join("third_party");
 
         let leptonica_dir = if third_party_dir.join("leptonica").exists() {
+            println!("cargo:warning=Using existing leptonica source");
             third_party_dir.join("leptonica")
         } else {
             fs::create_dir_all(&third_party_dir).expect("Failed to create third_party directory");
@@ -50,6 +69,7 @@ mod build_tesseract {
         };
 
         let tesseract_dir = if third_party_dir.join("tesseract").exists() {
+            println!("cargo:warning=Using existing tesseract source");
             third_party_dir.join("tesseract")
         } else {
             fs::create_dir_all(&third_party_dir).expect("Failed to create third_party directory");
@@ -70,34 +90,54 @@ mod build_tesseract {
 
                 let leptonica_src_dir = leptonica_dir.join("src");
                 let environ_h_path = leptonica_src_dir.join("environ.h");
-                let environ_h = std::fs::read_to_string(&environ_h_path)
-                    .expect("Failed to read environ.h")
-                    .replace(
-                        "#define  HAVE_LIBZ          1",
-                        "#define  HAVE_LIBZ          0",
-                    )
-                    .replace(
-                        "#ifdef  NO_CONSOLE_IO",
-                        "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO",
-                    );
-                std::fs::write(environ_h_path, environ_h).expect("Failed to write environ.h");
+
+                // Only modify environ.h if it exists
+                if environ_h_path.exists() {
+                    let environ_h = std::fs::read_to_string(&environ_h_path)
+                        .expect("Failed to read environ.h")
+                        .replace(
+                            "#define  HAVE_LIBZ          1",
+                            "#define  HAVE_LIBZ          0",
+                        )
+                        .replace(
+                            "#ifdef  NO_CONSOLE_IO",
+                            "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO",
+                        );
+                    std::fs::write(environ_h_path, environ_h).expect("Failed to write environ.h");
+                }
 
                 let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
-                let makefile_static = std::fs::read_to_string(&makefile_static_path)
-                    .expect("Failed to read makefile.static")
-                    .replace(
-                        "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
-                        "ALL_LIBS =	$(LEPTLIB) -lm",
-                    );
-                std::fs::write(makefile_static_path, makefile_static)
-                    .expect("Failed to write makefile.static");
 
-                if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                // Only modify makefile.static if it exists
+                if makefile_static_path.exists() {
+                    let makefile_static = std::fs::read_to_string(&makefile_static_path)
+                        .expect("Failed to read makefile.static")
+                        .replace(
+                            "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
+                            "ALL_LIBS =	$(LEPTLIB) -lm",
+                        );
+                    std::fs::write(makefile_static_path, makefile_static)
+                        .expect("Failed to write makefile.static");
+                }
+
+                // Configure build tools
+                if cfg!(target_os = "windows") {
+                    // Use NMake on Windows for better compatibility
+                    if let Ok(_vs_install_dir) = env::var("VSINSTALLDIR") {
+                        leptonica_config.generator("NMake Makefiles");
+                    }
+                }
+
+                // Only use sccache if not in CI
+                if env::var("CI").is_err()
+                    && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache"
+                {
                     leptonica_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
                 }
                 leptonica_config
+                    .define("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_PROG", "OFF")
                     .define("BUILD_SHARED_LIBS", "OFF")
@@ -115,6 +155,13 @@ mod build_tesseract {
                     .define("HAVE_LIBZ", "0")
                     .define("ENABLE_LTO", "OFF")
                     .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
+
+                // Windows-specific defines
+                if cfg!(target_os = "windows") {
+                    leptonica_config
+                        .define("CMAKE_C_FLAGS_RELEASE", "/MD /O2")
+                        .define("CMAKE_C_FLAGS_DEBUG", "/MDd /Od");
+                }
 
                 for (key, value) in &additional_defines {
                     leptonica_config.define(key, value);
@@ -143,12 +190,24 @@ mod build_tesseract {
                     .expect("Failed to write CMakeLists.txt");
 
                 let mut tesseract_config = Config::new(&tesseract_dir);
-                if env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache" {
+                // Configure build tools
+                if cfg!(target_os = "windows") {
+                    // Use NMake on Windows for better compatibility
+                    if let Ok(_vs_install_dir) = env::var("VSINSTALLDIR") {
+                        tesseract_config.generator("NMake Makefiles");
+                    }
+                }
+
+                // Only use sccache if not in CI
+                if env::var("CI").is_err()
+                    && env::var("RUSTC_WRAPPER").unwrap_or_default() == "sccache"
+                {
                     tesseract_config
                         .env("CC", "sccache cc")
                         .env("CXX", "sccache c++");
                 }
                 tesseract_config
+                    .define("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_TRAINING_TOOLS", "OFF")
                     .define("BUILD_SHARED_LIBS", "OFF")
@@ -177,7 +236,7 @@ mod build_tesseract {
                     .define("HAVE_LIBCURL", "OFF")
                     .define("HAVE_TIFFIO_H", "OFF")
                     .define("GRAPHICS_DISABLED", "ON")
-                    .define("DISABLED_LEGACY_ENGINE", "ON")
+                    .define("DISABLED_LEGACY_ENGINE", "OFF")
                     .define("USE_OPENCL", "OFF")
                     .define("OPENMP_BUILD", "OFF")
                     .define("BUILD_TESTS", "OFF")
@@ -210,8 +269,7 @@ mod build_tesseract {
             "cargo:rustc-link-search=native={}",
             tesseract_install_dir.join("lib").display()
         );
-        println!("cargo:rustc-link-lib=static=leptonica");
-        println!("cargo:rustc-link-lib=static=tesseract");
+        // Don't emit link directives here - let build_or_use_cached handle it
 
         set_os_specific_link_flags();
 
@@ -252,9 +310,17 @@ mod build_tesseract {
             }
         } else if cfg!(target_os = "windows") {
             // Windows-specific MSVC flags
-            cmake_cxx_flags.push_str("/EHsc /MP ");
-            additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD".to_string()));
-            additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd".to_string()));
+            cmake_cxx_flags.push_str("/EHsc /MP /std:c++17 ");
+            additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD /O2".to_string()));
+            additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd /Od".to_string()));
+            additional_defines.push((
+                "CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS".to_string(),
+                "ON".to_string(),
+            ));
+            additional_defines.push((
+                "CMAKE_MSVC_RUNTIME_LIBRARY".to_string(),
+                "MultiThreadedDLL".to_string(),
+            ));
         }
 
         // Common flags and defines for all platforms
@@ -303,12 +369,28 @@ mod build_tesseract {
 
         fs::create_dir_all(target_dir).expect("Failed to create target directory");
 
-        let client = Client::new();
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(300))
+            .build()
+            .expect("Failed to create HTTP client");
+
+        println!("cargo:warning=Downloading {} from {}", name, url);
         let mut response = client.get(url).send().expect("Failed to download archive");
+
+        if !response.status().is_success() {
+            panic!("Failed to download {}: HTTP {}", name, response.status());
+        }
+
         let mut content = Vec::new();
         response
             .copy_to(&mut content)
             .expect("Failed to read archive content");
+
+        println!(
+            "cargo:warning=Downloaded {} bytes for {}",
+            content.len(),
+            name
+        );
 
         let temp_file = target_dir.join(format!("{}.zip", name));
         fs::write(&temp_file, content).expect("Failed to write archive to file");
@@ -403,16 +485,37 @@ mod build_tesseract {
     where
         F: FnOnce(),
     {
+        // Expected library name for caching
         let lib_name = if cfg!(target_os = "windows") {
-            // .lib for Windows
             format!("{}.lib", name)
         } else {
-            // .a for Unix
             format!("lib{}.a", name)
         };
 
         let cached_path = cache_dir.join(&lib_name);
         let out_path = install_dir.join("lib").join(&lib_name);
+
+        // For Windows, check multiple possible library names
+        let possible_lib_names: Vec<String> = if cfg!(target_os = "windows") {
+            match name {
+                "leptonica" => vec![
+                    "leptonica.lib".to_string(),
+                    "libleptonica.lib".to_string(),
+                    "leptonica-static.lib".to_string(),
+                    "leptonica-1.84.1.lib".to_string(),
+                ],
+                "tesseract" => vec![
+                    "tesseract.lib".to_string(),
+                    "libtesseract.lib".to_string(),
+                    "tesseract-static.lib".to_string(),
+                    "tesseract53.lib".to_string(),
+                    "tesseract54.lib".to_string(),
+                ],
+                _ => vec![format!("{}.lib", name)],
+            }
+        } else {
+            vec![format!("lib{}.a", name)]
+        };
 
         fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
         fs::create_dir_all(out_path.parent().unwrap()).expect("Failed to create output directory");
@@ -428,15 +531,51 @@ mod build_tesseract {
             println!("Building {} library", name);
             build_fn();
 
-            if out_path.exists() {
-                if let Err(e) = fs::copy(&out_path, &cached_path) {
+            // Look for the library with various possible names
+            let mut found_lib_path = None;
+            for lib_name in &possible_lib_names {
+                let lib_path = install_dir.join("lib").join(lib_name);
+                if lib_path.exists() {
+                    println!(
+                        "cargo:warning=Found {} library at: {}",
+                        name,
+                        lib_path.display()
+                    );
+                    found_lib_path = Some(lib_path);
+                    break;
+                }
+            }
+
+            if let Some(lib_path) = found_lib_path {
+                // Copy to expected location for caching
+                if !out_path.exists() {
+                    if let Err(e) = fs::copy(&lib_path, &out_path) {
+                        println!(
+                            "cargo:warning=Failed to copy library to standard location: {}",
+                            e
+                        );
+                    }
+                }
+                // Cache the library
+                if let Err(e) = fs::copy(&lib_path, &cached_path) {
                     println!("cargo:warning=Failed to cache library: {}", e);
                 }
             } else {
                 println!(
-                    "cargo:warning=Expected library not found at: {}",
-                    out_path.display()
+                    "cargo:warning=Library {} not found! Searched for: {:?}",
+                    name, possible_lib_names
                 );
+                println!(
+                    "cargo:warning=In directory: {}",
+                    install_dir.join("lib").display()
+                );
+                // List files in lib directory for debugging
+                if let Ok(entries) = fs::read_dir(install_dir.join("lib")) {
+                    println!("cargo:warning=Files in lib directory:");
+                    for entry in entries.flatten() {
+                        println!("cargo:warning=  - {}", entry.file_name().to_string_lossy());
+                    }
+                }
             }
         }
 
@@ -446,6 +585,13 @@ mod build_tesseract {
         );
 
         println!("cargo:rustc-link-lib=static={}", name);
+
+        // For Windows, try alternative names if primary fails
+        if cfg!(target_os = "windows") && name == "leptonica" {
+            println!("cargo:rustc-link-lib=static=leptonica-1.84.1");
+        } else if cfg!(target_os = "windows") && name == "tesseract" {
+            println!("cargo:rustc-link-lib=static=tesseract53");
+        }
     }
 }
 

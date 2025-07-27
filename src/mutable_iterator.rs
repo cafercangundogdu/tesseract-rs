@@ -1,6 +1,6 @@
 use crate::error::{Result, TesseractError};
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_void};
+use std::ffi::CStr;
+use std::os::raw::{c_char, c_void};
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -183,33 +183,33 @@ impl MutableIterator {
         Ok(unsafe { TessResultIteratorNext(*handle, level) != 0 })
     }
 
-    /// Sets the value for the current iterator.
-    ///
-    /// # Arguments
-    ///
-    /// * `level` - Level of the value.
-    /// * `value` - Value to set.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if setting the value is successful, otherwise returns `false`.
-    pub fn set_value(&self, level: i32, value: &str) -> Result<bool> {
-        let c_value = CString::new(value).unwrap();
-        let handle = self.handle.lock().map_err(|_| TesseractError::MutexError)?;
-        let result = unsafe { TessMutableIteratorSetValue(*handle, level, c_value.as_ptr()) };
-        Ok(result != 0)
-    }
+    // /// Sets the value for the current iterator.
+    // ///
+    // /// # Arguments
+    // ///
+    // /// * `level` - Level of the value.
+    // /// * `value` - Value to set.
+    // ///
+    // /// # Returns
+    // ///
+    // /// Returns `true` if setting the value is successful, otherwise returns `false`.
+    // pub fn set_value(&self, level: i32, value: &str) -> Result<bool> {
+    //     let c_value = CString::new(value).unwrap();
+    //     let handle = self.handle.lock().map_err(|_| TesseractError::MutexError)?;
+    //     let result = unsafe { TessMutableIteratorSetValue(*handle, level, c_value.as_ptr()) };
+    //     Ok(result != 0)
+    // }
 
-    /// Deletes the MutableIterator.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if deleting the MutableIterator is successful, otherwise returns `false`.
-    pub fn delete(&self) -> Result<bool> {
-        let handle = self.handle.lock().map_err(|_| TesseractError::MutexError)?;
-        let result = unsafe { TessMutableIteratorDelete(*handle) };
-        Ok(result != 0)
-    }
+    // /// Deletes the MutableIterator.
+    // ///
+    // /// # Returns
+    // ///
+    // /// Returns `true` if deleting the MutableIterator is successful, otherwise returns `false`.
+    // pub fn delete(&self) -> Result<bool> {
+    //     let handle = self.handle.lock().map_err(|_| TesseractError::MutexError)?;
+    //     let result = unsafe { TessMutableIteratorDelete(*handle) };
+    //     Ok(result != 0)
+    // }
 }
 
 impl Drop for MutableIterator {
@@ -221,12 +221,13 @@ impl Drop for MutableIterator {
 }
 
 extern "C" {
-    pub fn TessMutableIteratorSetValue(
-        handle: *mut c_void,
-        level: c_int,
-        value: *const c_char,
-    ) -> c_int;
-    pub fn TessMutableIteratorDelete(handle: *mut c_void) -> c_int;
+    // These functions don't exist in Tesseract C API
+    // pub fn TessMutableIteratorSetValue(
+    //     handle: *mut c_void,
+    //     level: c_int,
+    //     value: *const c_char,
+    // ) -> c_int;
+    // pub fn TessMutableIteratorDelete(handle: *mut c_void) -> c_int;
     pub fn TessResultIteratorDelete(handle: *mut c_void);
     pub fn TessDeleteText(text: *mut c_char);
 }

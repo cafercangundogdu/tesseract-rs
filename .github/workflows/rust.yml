@@ -7,8 +7,54 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: read
 
 jobs:
+  # Run clippy and rustfmt checks
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.cargo/bin
+          target
+        key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-lint-
+    
+    - name: Check formatting
+      run: cargo fmt -- --check
+    
+    - name: Run clippy
+      run: cargo clippy -- -D warnings
+      env:
+        RUSTC_WRAPPER: ""
+    
+    - name: Install cargo-audit
+      run: |
+        if ! command -v cargo-audit &> /dev/null; then
+          cargo install cargo-audit
+        fi
+      env:
+        RUSTC_WRAPPER: ""
+    
+    - name: Run security audit
+      run: cargo audit || true  # Allow audit to fail for now due to transitive dependencies
+      
   build:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -21,25 +67,143 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       
-    - name: Install sccache
+    - name: Install dependencies (Windows)
+      if: matrix.os == 'windows-latest'
       run: |
-        cargo install sccache
-        echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        choco install visualstudio2022buildtools
+        choco install visualstudio2022-workload-vctools
     
-    - name: Cache dependencies
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+    
+    - name: Install dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake
+    
+    # Skip sccache for now to avoid issues
+    # - name: Install sccache
+    #   run: cargo install sccache
+    
+    - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-          ~/.cache/sccache
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
     
-    - name: Build
-      run: cargo build --verbose
+    - name: Cache build artifacts
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/Library/Application Support/tesseract-rs
+          ~/.tesseract-rs
+          ~/AppData/Roaming/tesseract-rs
+          C:\Users\runneradmin\AppData\Roaming\tesseract-rs
+        key: ${{ runner.os }}-tesseract-build-${{ hashFiles('build.rs') }}
+        restore-keys: |
+          ${{ runner.os }}-tesseract-build-
+    
+    - name: Setup MSVC environment (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: ilammy/msvc-dev-cmd@v1
+    
+    - name: Fix Windows linking (Rename Git's link.exe)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        # Rename Git's link.exe to avoid conflicts with MSVC
+        $gitLinkPath = "C:\Program Files\Git\usr\bin\link.exe"
+        if (Test-Path $gitLinkPath) {
+          Rename-Item $gitLinkPath -NewName "link_git.exe" -Force
+          echo "Renamed Git's link.exe to link_git.exe"
+        }
       
-    - name: Run tests
+    - name: Build (Unix)
+      if: matrix.os != 'windows-latest'
+      run: cargo build --verbose
+      shell: bash
+      env:
+        RUSTC_WRAPPER: ""
+    
+    - name: Build (Windows)
+      if: matrix.os == 'windows-latest'
+      run: cargo build --verbose
+      shell: pwsh
+      env:
+        RUSTC_WRAPPER: ""
+      
+    - name: Run tests (Unix)
+      if: matrix.os != 'windows-latest'
       run: cargo test --verbose
+      shell: bash
+      env:
+        RUST_LOG: debug
+        RUSTC_WRAPPER: ""
+    
+    - name: Run tests (Windows)
+      if: matrix.os == 'windows-latest'
+      run: cargo test --verbose
+      shell: pwsh
+      env:
+        RUST_LOG: debug
+        RUSTC_WRAPPER: ""
+    
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.cargo/bin
+          target
+        key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-coverage-
+    
+    - name: Cache build artifacts
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.tesseract-rs
+        key: ${{ runner.os }}-tesseract-coverage-${{ hashFiles('build.rs') }}
+        restore-keys: |
+          ${{ runner.os }}-tesseract-coverage-
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+    
+    - name: Install tarpaulin
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin
+        fi
+    
+    - name: Generate coverage report
+      run: cargo tarpaulin --out xml --ignore-tests --timeout 300
+      env:
+        RUSTC_WRAPPER: ""
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./cobertura.xml
+        fail_ci_if_error: false
