@@ -92,26 +92,43 @@ jobs:
       if: matrix.os == 'windows-latest'
       uses: ilammy/msvc-dev-cmd@v1
     
-    - name: Fix Windows linking (Remove Git from PATH)
+    - name: Fix Windows linking (Rename Git's link.exe)
       if: matrix.os == 'windows-latest'
-      shell: cmd
+      shell: pwsh
       run: |
-        echo PATH before: %PATH%
-        set "PATH=%PATH:C:\Program Files\Git\usr\bin;=%"
-        set "PATH=%PATH:C:\Program Files\Git\bin;=%"
-        set "PATH=%PATH:C:\Program Files\Git\cmd;=%"
-        echo PATH=%PATH%>> %GITHUB_ENV%
-        echo PATH after: %PATH%
+        # Rename Git's link.exe to avoid conflicts with MSVC
+        $gitLinkPath = "C:\Program Files\Git\usr\bin\link.exe"
+        if (Test-Path $gitLinkPath) {
+          Rename-Item $gitLinkPath -NewName "link_git.exe" -Force
+          echo "Renamed Git's link.exe to link_git.exe"
+        }
       
-    - name: Build
+    - name: Build (Unix)
+      if: matrix.os != 'windows-latest'
       run: cargo build --verbose
       shell: bash
       env:
         RUSTC_WRAPPER: ""
+    
+    - name: Build (Windows)
+      if: matrix.os == 'windows-latest'
+      run: cargo build --verbose
+      shell: pwsh
+      env:
+        RUSTC_WRAPPER: ""
       
-    - name: Run tests
+    - name: Run tests (Unix)
+      if: matrix.os != 'windows-latest'
       run: cargo test --verbose
       shell: bash
+      env:
+        RUST_LOG: debug
+        RUSTC_WRAPPER: ""
+    
+    - name: Run tests (Windows)
+      if: matrix.os == 'windows-latest'
+      run: cargo test --verbose
+      shell: pwsh
       env:
         RUST_LOG: debug
         RUSTC_WRAPPER: ""
