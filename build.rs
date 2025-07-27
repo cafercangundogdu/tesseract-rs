@@ -269,15 +269,7 @@ mod build_tesseract {
             "cargo:rustc-link-search=native={}",
             tesseract_install_dir.join("lib").display()
         );
-        // Link libraries with platform-specific names
-        if cfg!(target_os = "windows") {
-            // Try multiple possible library names on Windows
-            println!("cargo:rustc-link-lib=static=leptonica-1.84.1");
-            println!("cargo:rustc-link-lib=static=tesseract53");
-        } else {
-            println!("cargo:rustc-link-lib=static=leptonica");
-            println!("cargo:rustc-link-lib=static=tesseract");
-        }
+        // Don't emit link directives here - let build_or_use_cached handle it
 
         set_os_specific_link_flags();
 
@@ -493,30 +485,36 @@ mod build_tesseract {
     where
         F: FnOnce(),
     {
+        // Expected library name for caching
         let lib_name = if cfg!(target_os = "windows") {
-            // Windows static libraries can have different naming conventions
-            match name {
-                "leptonica" => "leptonica-1.84.1.lib".to_string(),
-                "tesseract" => "tesseract53.lib".to_string(),
-                _ => format!("{}.lib", name),
-            }
+            format!("{}.lib", name)
         } else {
-            // .a for Unix
             format!("lib{}.a", name)
         };
 
         let cached_path = cache_dir.join(&lib_name);
         let out_path = install_dir.join("lib").join(&lib_name);
 
-        // For Windows, also check for alternative library names
-        let alt_lib_names = if cfg!(target_os = "windows") {
+        // For Windows, check multiple possible library names
+        let possible_lib_names = if cfg!(target_os = "windows") {
             match name {
-                "leptonica" => vec!["leptonica.lib", "libleptonica.lib", "leptonica-static.lib"],
-                "tesseract" => vec!["tesseract.lib", "libtesseract.lib", "tesseract-static.lib"],
-                _ => vec![],
+                "leptonica" => vec![
+                    "leptonica.lib",
+                    "libleptonica.lib", 
+                    "leptonica-static.lib",
+                    "leptonica-1.84.1.lib"
+                ],
+                "tesseract" => vec![
+                    "tesseract.lib",
+                    "libtesseract.lib",
+                    "tesseract-static.lib",
+                    "tesseract53.lib",
+                    "tesseract54.lib"
+                ],
+                _ => vec![format!("{}.lib", name)],
             }
         } else {
-            vec![]
+            vec![format!("lib{}.a", name)]
         };
 
         fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
@@ -533,41 +531,50 @@ mod build_tesseract {
             println!("Building {} library", name);
             build_fn();
 
-            if out_path.exists() {
-                if let Err(e) = fs::copy(&out_path, &cached_path) {
+            // Look for the library with various possible names
+            let mut found_lib_path = None;
+            for lib_name in &possible_lib_names {
+                let lib_path = install_dir.join("lib").join(lib_name);
+                if lib_path.exists() {
+                    println!(
+                        "cargo:warning=Found {} library at: {}",
+                        name,
+                        lib_path.display()
+                    );
+                    found_lib_path = Some(lib_path);
+                    break;
+                }
+            }
+            
+            if let Some(lib_path) = found_lib_path {
+                // Copy to expected location for caching
+                if !out_path.exists() {
+                    if let Err(e) = fs::copy(&lib_path, &out_path) {
+                        println!("cargo:warning=Failed to copy library to standard location: {}", e);
+                    }
+                }
+                // Cache the library
+                if let Err(e) = fs::copy(&lib_path, &cached_path) {
                     println!("cargo:warning=Failed to cache library: {}", e);
                 }
             } else {
-                // On Windows, check for alternative library names
-                let mut found = false;
-                for alt_name in &alt_lib_names {
-                    let alt_path = install_dir.join("lib").join(alt_name);
-                    if alt_path.exists() {
-                        println!(
-                            "cargo:warning=Found library at alternative path: {}",
-                            alt_path.display()
-                        );
-                        if let Err(e) = fs::copy(&alt_path, &out_path) {
-                            println!("cargo:warning=Failed to copy library: {}", e);
-                        } else {
-                            found = true;
-                            if let Err(e) = fs::copy(&out_path, &cached_path) {
-                                println!("cargo:warning=Failed to cache library: {}", e);
-                            }
+                println!(
+                    "cargo:warning=Library {} not found! Searched for: {:?}",
+                    name,
+                    possible_lib_names
+                );
+                println!(
+                    "cargo:warning=In directory: {}",
+                    install_dir.join("lib").display()
+                );
+                // List files in lib directory for debugging
+                if let Ok(entries) = fs::read_dir(install_dir.join("lib")) {
+                    println!("cargo:warning=Files in lib directory:");
+                    for entry in entries {
+                        if let Ok(entry) = entry {
+                            println!("cargo:warning=  - {}", entry.file_name().to_string_lossy());
                         }
-                        break;
                     }
-                }
-
-                if !found {
-                    println!(
-                        "cargo:warning=Expected library not found at: {}",
-                        out_path.display()
-                    );
-                    println!(
-                        "cargo:warning=Also checked alternative names: {:?}",
-                        alt_lib_names
-                    );
                 }
             }
         }
@@ -578,6 +585,13 @@ mod build_tesseract {
         );
 
         println!("cargo:rustc-link-lib=static={}", name);
+        
+        // For Windows, try alternative names if primary fails
+        if cfg!(target_os = "windows") && name == "leptonica" {
+            println!("cargo:rustc-link-lib=static=leptonica-1.84.1");
+        } else if cfg!(target_os = "windows") && name == "tesseract" {
+            println!("cargo:rustc-link-lib=static=tesseract53");
+        }
     }
 }
 
