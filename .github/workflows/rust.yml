@@ -92,12 +92,16 @@ jobs:
       if: matrix.os == 'windows-latest'
       uses: ilammy/msvc-dev-cmd@v1
     
-    - name: Remove Git usr/bin from PATH (Windows)
+    - name: Fix Windows linking (Remove Git from PATH)
       if: matrix.os == 'windows-latest'
-      shell: pwsh
+      shell: cmd
       run: |
-        $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*Git*usr*bin*' }) -join ';'
-        echo "PATH=$env:PATH" >> $env:GITHUB_ENV
+        echo PATH before: %PATH%
+        set "PATH=%PATH:C:\Program Files\Git\usr\bin;=%"
+        set "PATH=%PATH:C:\Program Files\Git\bin;=%"
+        set "PATH=%PATH:C:\Program Files\Git\cmd;=%"
+        echo PATH=%PATH%>> %GITHUB_ENV%
+        echo PATH after: %PATH%
       
     - name: Build
       run: cargo build --verbose
