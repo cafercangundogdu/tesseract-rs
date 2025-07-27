@@ -496,20 +496,20 @@ mod build_tesseract {
         let out_path = install_dir.join("lib").join(&lib_name);
 
         // For Windows, check multiple possible library names
-        let possible_lib_names = if cfg!(target_os = "windows") {
+        let possible_lib_names: Vec<String> = if cfg!(target_os = "windows") {
             match name {
                 "leptonica" => vec![
-                    "leptonica.lib",
-                    "libleptonica.lib", 
-                    "leptonica-static.lib",
-                    "leptonica-1.84.1.lib"
+                    "leptonica.lib".to_string(),
+                    "libleptonica.lib".to_string(), 
+                    "leptonica-static.lib".to_string(),
+                    "leptonica-1.84.1.lib".to_string()
                 ],
                 "tesseract" => vec![
-                    "tesseract.lib",
-                    "libtesseract.lib",
-                    "tesseract-static.lib",
-                    "tesseract53.lib",
-                    "tesseract54.lib"
+                    "tesseract.lib".to_string(),
+                    "libtesseract.lib".to_string(),
+                    "tesseract-static.lib".to_string(),
+                    "tesseract53.lib".to_string(),
+                    "tesseract54.lib".to_string()
                 ],
                 _ => vec![format!("{}.lib", name)],
             }
