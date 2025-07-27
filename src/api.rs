@@ -1373,8 +1373,9 @@ impl TesseractAPI {
     /// # Returns
     ///
     /// Returns the Unicode character as a String if successful, otherwise returns an error.
-    pub fn get_unichar(unichar_id: i32) -> Result<String> {
-        let char_ptr = unsafe { TessGetUnichar(unichar_id) };
+    pub fn get_unichar(&self, unichar_id: i32) -> Result<String> {
+        let handle = self.handle.lock().unwrap();
+        let char_ptr = unsafe { TessBaseAPIGetUnichar(*handle, unichar_id) };
         if char_ptr.is_null() {
             Err(TesseractError::NullPointerError)
         } else {
@@ -1591,7 +1592,7 @@ extern "C" {
     );
     pub fn TessDeleteText(text: *mut c_char);
 
-    fn TessGetUnichar(unichar_id: c_int) -> *const c_char;
+    fn TessBaseAPIGetUnichar(handle: *mut c_void, unichar_id: c_int) -> *const c_char;
 
     fn TessBaseAPIProcessPages(
         handle: *mut c_void,

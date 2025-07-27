@@ -236,7 +236,7 @@ mod build_tesseract {
                     .define("HAVE_LIBCURL", "OFF")
                     .define("HAVE_TIFFIO_H", "OFF")
                     .define("GRAPHICS_DISABLED", "ON")
-                    .define("DISABLED_LEGACY_ENGINE", "ON")
+                    .define("DISABLED_LEGACY_ENGINE", "OFF")
                     .define("USE_OPENCL", "OFF")
                     .define("OPENMP_BUILD", "OFF")
                     .define("BUILD_TESTS", "OFF")
