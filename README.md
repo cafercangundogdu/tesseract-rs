@@ -18,14 +18,14 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.1.21", features = ["build-tesseract"] }
+tesseract-rs = { version = "0.1.22", features = ["build-tesseract"] }
 ```
 
 For single-binary deployment with embedded tessdata:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.1.21", features = ["embed-tessdata"] }
+tesseract-rs = { version = "0.1.22", features = ["embed-tessdata"] }
 ```
 
 For development and testing, you'll also need these dependencies:
