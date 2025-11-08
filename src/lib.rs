@@ -146,3 +146,8 @@ mod enums;
 pub use enums::{TessPageIteratorLevel, TessPageSegMode, TessPolyBlockType};
 mod api;
 pub use api::TesseractAPI;
+
+#[cfg(feature = "embed-tessdata")]
+mod embedded;
+#[cfg(feature = "embed-tessdata")]
+pub use embedded::*;

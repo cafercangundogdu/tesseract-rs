@@ -41,6 +41,7 @@ zip = { version = "2.4.2", optional = true }
 [features]
 default = ["build-tesseract"]
 build-tesseract = ["cc", "glob", "cmake", "reqwest", "zip"]
+embed-tessdata = ["build-tesseract"]
 
 [package.metadata.docs.rs]
 features = ["docs-only"]

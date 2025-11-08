@@ -13,7 +13,7 @@ mod build_tesseract {
     const TESSERACT_URL: &str =
         "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.3.4.zip";
 
-    fn get_custom_out_dir() -> PathBuf {
+    pub fn get_custom_out_dir() -> PathBuf {
         if cfg!(target_os = "macos") {
             let home_dir = env::var("HOME").unwrap_or_else(|_| {
                 env::var("USER")
@@ -614,4 +614,60 @@ mod build_tesseract {
 fn main() {
     #[cfg(feature = "build-tesseract")]
     build_tesseract::build();
+    
+    #[cfg(feature = "embed-tessdata")]
+    generate_embedded_tessdata();
+}
+
+#[cfg(feature = "embed-tessdata")]
+fn generate_embedded_tessdata() {
+    use std::fs;
+    use std::path::Path;
+    
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let tessdata_dir = build_tesseract::get_custom_out_dir().join("tessdata");
+    
+    let mut embedded_code = String::new();
+    embedded_code.push_str("// Auto-generated embedded tessdata\n");
+    embedded_code.push_str("use std::collections::HashMap;\n\n");
+    embedded_code.push_str("pub struct EmbeddedTessdata {\n");
+    embedded_code.push_str("    data: HashMap<&'static str, &'static [u8]>,\n");
+    embedded_code.push_str("}\n\n");
+    embedded_code.push_str("impl EmbeddedTessdata {\n");
+    embedded_code.push_str("    pub fn new() -> Self {\n");
+    embedded_code.push_str("        let mut data = HashMap::new();\n");
+    
+    // Embed common language files
+    let languages = ["eng", "tur"];
+    for lang in &languages {
+        let traineddata_file = tessdata_dir.join(format!("{}.traineddata", lang));
+        if traineddata_file.exists() {
+            embedded_code.push_str(&format!(
+                "        data.insert(\"{}\", include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{}.traineddata\")) as &'static [u8]);\n",
+                lang, lang
+            ));
+            
+            // Copy the file to OUT_DIR so include_bytes! can find it
+            let dest = Path::new(&out_dir).join(format!("{}.traineddata", lang));
+            if let Err(e) = fs::copy(&traineddata_file, &dest) {
+                println!("cargo:warning=Failed to copy {}.traineddata: {}", lang, e);
+            }
+        }
+    }
+    
+    embedded_code.push_str("        Self { data }\n");
+    embedded_code.push_str("    }\n\n");
+    embedded_code.push_str("    pub fn get(&self, language: &str) -> Option<&'static [u8]> {\n");
+    embedded_code.push_str("        self.data.get(language).copied()\n");
+    embedded_code.push_str("    }\n\n");
+    embedded_code.push_str("    pub fn available_languages(&self) -> Vec<&'static str> {\n");
+    embedded_code.push_str("        self.data.keys().copied().collect()\n");
+    embedded_code.push_str("    }\n");
+    embedded_code.push_str("}\n\n");
+    embedded_code.push_str("pub static EMBEDDED_TESSDATA: std::sync::LazyLock<EmbeddedTessdata> = std::sync::LazyLock::new(|| EmbeddedTessdata::new());\n");
+    
+    let embedded_file = Path::new(&out_dir).join("embedded_tessdata.rs");
+    fs::write(&embedded_file, embedded_code).expect("Failed to write embedded tessdata file");
+    
+    println!("cargo:rerun-if-changed={}", tessdata_dir.display());
 }
