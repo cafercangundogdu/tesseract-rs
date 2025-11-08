@@ -637,8 +637,12 @@ fn generate_embedded_tessdata() {
     embedded_code.push_str("    pub fn new() -> Self {\n");
     embedded_code.push_str("        let mut data = HashMap::new();\n");
     
-    // Embed common language files
-    let languages = ["eng", "tur"];
+    // Embed language files based on environment variables
+    let embed_languages = std::env::var("TESSERACT_EMBED_LANGUAGES")
+        .unwrap_or_else(|_| "eng,tur".to_string());
+    
+    let languages: Vec<&str> = embed_languages.split(',').map(|s| s.trim()).collect();
+    
     for lang in &languages {
         let traineddata_file = tessdata_dir.join(format!("{}.traineddata", lang));
         if traineddata_file.exists() {
@@ -652,6 +656,8 @@ fn generate_embedded_tessdata() {
             if let Err(e) = fs::copy(&traineddata_file, &dest) {
                 println!("cargo:warning=Failed to copy {}.traineddata: {}", lang, e);
             }
+        } else {
+            println!("cargo:warning=Language {} not found in tessdata directory", lang);
         }
     }
     

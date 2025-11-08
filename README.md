@@ -28,6 +28,16 @@ For single-binary deployment with embedded tessdata:
 tesseract-rs = { version = "0.1.22", features = ["embed-tessdata"] }
 ```
 
+By default, both English and Turkish tessdata are embedded. To embed only specific languages, set the `TESSERACT_EMBED_LANGUAGES` environment variable during build:
+
+```bash
+# Embed only English
+TESSERACT_EMBED_LANGUAGES=eng cargo build --features embed-tessdata
+
+# Embed multiple languages
+TESSERACT_EMBED_LANGUAGES=eng,fra,deu cargo build --features embed-tessdata
+```
+
 For development and testing, you'll also need these dependencies:
 
 ```toml
