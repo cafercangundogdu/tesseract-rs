@@ -31,6 +31,13 @@ mod build_tesseract {
                     .expect("Neither HOME nor USER environment variable set")
             });
             PathBuf::from(home_dir).join(".tesseract-rs")
+        } else if cfg!(target_os = "freebsd") {
+            let home_dir = env::var("HOME").unwrap_or_else(|_| {
+                env::var("USER")
+                    .map(|user| format!("/home/{}", user))
+                    .expect("Neither HOME nor USER environment variable set")
+            });
+            PathBuf::from(home_dir).join(".tesseract-rs")
         } else if cfg!(target_os = "windows") {
             env::var("APPDATA")
                 .or_else(|_| env::var("USERPROFILE").map(|p| format!("{}\\AppData\\Roaming", p)))
@@ -308,6 +315,11 @@ mod build_tesseract {
                 // Assume GCC
                 additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "g++".to_string()));
             }
+        } else if cfg!(target_os = "freebsd") {
+            cmake_cxx_flags.push_str("-std=c++11 ");
+            // FreeBSD typically uses clang by default
+            cmake_cxx_flags.push_str("-stdlib=libc++ ");
+            additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "clang++".to_string()));
         } else if cfg!(target_os = "windows") {
             // Windows-specific MSVC flags
             cmake_cxx_flags.push_str("/EHsc /MP /std:c++17 ");
@@ -349,6 +361,10 @@ mod build_tesseract {
             println!("cargo:rustc-link-lib=pthread");
             println!("cargo:rustc-link-lib=m");
             println!("cargo:rustc-link-lib=dl");
+        } else if cfg!(target_os = "freebsd") {
+            println!("cargo:rustc-link-lib=c++");
+            println!("cargo:rustc-link-lib=pthread");
+            println!("cargo:rustc-link-lib=m");
         } else if cfg!(target_os = "windows") {
             // Additional linker flags are generally not required for Windows,
             // as MSVC automatically links the necessary libraries.

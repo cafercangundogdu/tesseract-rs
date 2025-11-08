@@ -9,7 +9,7 @@
 - Automatic download of Tesseract training data (English and Turkish)
 - High-level Rust API for common OCR tasks
 - Caching of compiled libraries for faster subsequent builds
-- Support for multiple operating systems (Linux, macOS, Windows)
+- Support for multiple operating systems (Linux, macOS, Windows, FreeBSD)
 
 ## Installation
 
@@ -58,6 +58,7 @@ The crate uses the following directory structure based on your operating system:
 
 - macOS: `~/Library/Application Support/tesseract-rs`
 - Linux: `~/.tesseract-rs`
+- FreeBSD: `~/.tesseract-rs`
 - Windows: `%APPDATA%/tesseract-rs`
 
 The cache includes:
@@ -127,6 +128,11 @@ fn get_default_tessdata_dir() -> PathBuf {
             .join("tesseract-rs")
             .join("tessdata")
     } else if cfg!(target_os = "linux") {
+        let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+        PathBuf::from(home_dir)
+            .join(".tesseract-rs")
+            .join("tessdata")
+    } else if cfg!(target_os = "freebsd") {
         let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
         PathBuf::from(home_dir)
             .join(".tesseract-rs")

@@ -35,6 +35,11 @@
 //!         PathBuf::from(home_dir)
 //!             .join(".tesseract-rs")
 //!             .join("tessdata")
+//!     } else if cfg!(target_os = "freebsd") {
+//!         let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+//!         PathBuf::from(home_dir)
+//!             .join(".tesseract-rs")
+//!             .join("tessdata")
 //!     } else if cfg!(target_os = "windows") {
 //!         PathBuf::from(std::env::var("APPDATA").expect("APPDATA environment variable not set"))
 //!             .join("tesseract-rs")
