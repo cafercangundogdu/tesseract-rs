@@ -614,7 +614,7 @@ mod build_tesseract {
 fn main() {
     #[cfg(feature = "build-tesseract")]
     build_tesseract::build();
-    
+
     #[cfg(feature = "embed-tessdata")]
     generate_embedded_tessdata();
 }
@@ -623,10 +623,10 @@ fn main() {
 fn generate_embedded_tessdata() {
     use std::fs;
     use std::path::Path;
-    
+
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let tessdata_dir = build_tesseract::get_custom_out_dir().join("tessdata");
-    
+
     let mut embedded_code = String::new();
     embedded_code.push_str("// Auto-generated embedded tessdata\n");
     embedded_code.push_str("use std::collections::HashMap;\n\n");
@@ -636,13 +636,13 @@ fn generate_embedded_tessdata() {
     embedded_code.push_str("impl EmbeddedTessdata {\n");
     embedded_code.push_str("    pub fn new() -> Self {\n");
     embedded_code.push_str("        let mut data = HashMap::new();\n");
-    
+
     // Embed language files based on environment variables
-    let embed_languages = std::env::var("TESSERACT_EMBED_LANGUAGES")
-        .unwrap_or_else(|_| "eng,tur".to_string());
-    
+    let embed_languages =
+        std::env::var("TESSERACT_EMBED_LANGUAGES").unwrap_or_else(|_| "eng,tur".to_string());
+
     let languages: Vec<&str> = embed_languages.split(',').map(|s| s.trim()).collect();
-    
+
     for lang in &languages {
         let traineddata_file = tessdata_dir.join(format!("{}.traineddata", lang));
         if traineddata_file.exists() {
@@ -650,17 +650,20 @@ fn generate_embedded_tessdata() {
                 "        data.insert(\"{}\", include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{}.traineddata\")) as &'static [u8]);\n",
                 lang, lang
             ));
-            
+
             // Copy the file to OUT_DIR so include_bytes! can find it
             let dest = Path::new(&out_dir).join(format!("{}.traineddata", lang));
             if let Err(e) = fs::copy(&traineddata_file, &dest) {
                 println!("cargo:warning=Failed to copy {}.traineddata: {}", lang, e);
             }
         } else {
-            println!("cargo:warning=Language {} not found in tessdata directory", lang);
+            println!(
+                "cargo:warning=Language {} not found in tessdata directory",
+                lang
+            );
         }
     }
-    
+
     embedded_code.push_str("        Self { data }\n");
     embedded_code.push_str("    }\n\n");
     embedded_code.push_str("    pub fn get(&self, language: &str) -> Option<&'static [u8]> {\n");
@@ -671,9 +674,9 @@ fn generate_embedded_tessdata() {
     embedded_code.push_str("    }\n");
     embedded_code.push_str("}\n\n");
     embedded_code.push_str("pub static EMBEDDED_TESSDATA: std::sync::LazyLock<EmbeddedTessdata> = std::sync::LazyLock::new(|| EmbeddedTessdata::new());\n");
-    
+
     let embedded_file = Path::new(&out_dir).join("embedded_tessdata.rs");
     fs::write(&embedded_file, embedded_code).expect("Failed to write embedded tessdata file");
-    
+
     println!("cargo:rerun-if-changed={}", tessdata_dir.display());
 }
