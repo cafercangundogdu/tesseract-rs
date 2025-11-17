@@ -1,6 +1,6 @@
 [package]
 name = "tesseract-rs"
-version = "0.1.20"
+version = "0.1.22"
 edition = "2021"
 authors = ["Cafer Can Gündoğdu <cafercangundogdu@gmail.com>"]
 description = "Rust bindings for Tesseract OCR with optional built-in compilation"
@@ -41,6 +41,7 @@ zip = { version = "2.4.2", optional = true }
 [features]
 default = ["build-tesseract"]
 build-tesseract = ["cc", "glob", "cmake", "reqwest", "zip"]
+embed-tessdata = ["build-tesseract"]
 
 [package.metadata.docs.rs]
 features = ["docs-only"]
