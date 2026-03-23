@@ -90,10 +90,13 @@ impl TessResultRenderer {
     /// # Returns
     ///
     /// Returns `true` if the document was created successfully, otherwise returns `false`.
-    pub fn begin_document(&self, title: &str) -> bool {
+    pub fn begin_document(&self, title: &str) -> Result<bool> {
         let title = CString::new(title).unwrap();
-        let handle = self.handle.lock().unwrap();
-        unsafe { TessResultRendererBeginDocument(*handle, title.as_ptr()) != 0 }
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        Ok(unsafe { TessResultRendererBeginDocument(*handle, title.as_ptr()) != 0 })
     }
 
     /// Adds an image to the document.
@@ -105,10 +108,16 @@ impl TessResultRenderer {
     /// # Returns
     ///
     /// Returns `true` if the image was added successfully, otherwise returns `false`.
-    pub fn add_image(&self, api: &TesseractAPI) -> bool {
-        let api_handle = api.handle.lock().unwrap();
-        let handle = self.handle.lock().unwrap();
-        unsafe { TessResultRendererAddImage(*handle, *api_handle) != 0 }
+    pub fn add_image(&self, api: &TesseractAPI) -> Result<bool> {
+        let api_handle = api
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        Ok(unsafe { TessResultRendererAddImage(*handle, *api_handle) != 0 })
     }
 
     /// Ends the document.
@@ -116,9 +125,12 @@ impl TessResultRenderer {
     /// # Returns
     ///
     /// Returns `true` if the document was ended successfully, otherwise returns `false`.
-    pub fn end_document(&self) -> bool {
-        let handle = self.handle.lock().unwrap();
-        unsafe { TessResultRendererEndDocument(*handle) != 0 }
+    pub fn end_document(&self) -> Result<bool> {
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        Ok(unsafe { TessResultRendererEndDocument(*handle) != 0 })
     }
 
     /// Gets the extension of the document.
@@ -127,7 +139,10 @@ impl TessResultRenderer {
     ///
     /// Returns the extension as a `String` if successful, otherwise returns an error.
     pub fn get_extension(&self) -> Result<String> {
-        let handle = self.handle.lock().unwrap();
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
         let ext_ptr = unsafe { TessResultRendererExtention(*handle) };
         if ext_ptr.is_null() {
             Err(TesseractError::NullPointerError)
@@ -143,7 +158,10 @@ impl TessResultRenderer {
     ///
     /// Returns the title as a `String` if successful, otherwise returns an error.
     pub fn get_title(&self) -> Result<String> {
-        let handle = self.handle.lock().unwrap();
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
         let title_ptr = unsafe { TessResultRendererTitle(*handle) };
         if title_ptr.is_null() {
             Err(TesseractError::NullPointerError)
@@ -158,19 +176,25 @@ impl TessResultRenderer {
     /// # Returns
     ///
     /// Returns the number of images as an `i32`.
-    pub fn get_image_num(&self) -> i32 {
-        let handle = self.handle.lock().unwrap();
-        unsafe { TessResultRendererImageNum(*handle) }
+    pub fn get_image_num(&self) -> Result<i32> {
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        Ok(unsafe { TessResultRendererImageNum(*handle) })
     }
 }
 
 impl Drop for TessResultRenderer {
     fn drop(&mut self) {
-        let handle = self.handle.lock().unwrap();
-        unsafe { TessDeleteResultRenderer(*handle) };
+        if let Ok(handle) = self.handle.lock() {
+            unsafe { TessDeleteResultRenderer(*handle) };
+        }
     }
 }
 
+#[cfg(feature = "build-tesseract")]
+#[link(name = "tesseract")]
 extern "C" {
     pub fn TessTextRendererCreate(outputbase: *const c_char) -> *mut c_void;
     pub fn TessHOcrRendererCreate(outputbase: *const c_char) -> *mut c_void;

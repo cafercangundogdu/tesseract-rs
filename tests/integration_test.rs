@@ -1,69 +1,7 @@
-use image::{DynamicImage, ImageBuffer, Luma};
-use imageproc::contrast::adaptive_threshold;
-use imageproc::filter::filter3x3;
-use std::path::PathBuf;
+mod common;
+use common::*;
+
 use tesseract_rs::TesseractAPI;
-
-fn get_default_tessdata_dir() -> PathBuf {
-    if cfg!(target_os = "macos") {
-        let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
-        PathBuf::from(home_dir)
-            .join("Library")
-            .join("Application Support")
-            .join("tesseract-rs")
-            .join("tessdata")
-    } else if cfg!(target_os = "linux") {
-        let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
-        PathBuf::from(home_dir)
-            .join(".tesseract-rs")
-            .join("tessdata")
-    } else if cfg!(target_os = "windows") {
-        PathBuf::from(std::env::var("APPDATA").expect("APPDATA environment variable not set"))
-            .join("tesseract-rs")
-            .join("tessdata")
-    } else {
-        panic!("Unsupported operating system");
-    }
-}
-
-fn get_tessdata_dir() -> PathBuf {
-    match std::env::var("TESSDATA_PREFIX") {
-        Ok(dir) => {
-            let path = PathBuf::from(dir);
-            println!("Using TESSDATA_PREFIX directory: {:?}", path);
-            path
-        }
-        Err(_) => {
-            let default_dir = get_default_tessdata_dir();
-            println!(
-                "TESSDATA_PREFIX not set, using default directory: {:?}",
-                default_dir
-            );
-            default_dir
-        }
-    }
-}
-
-fn preprocess_image(img: &DynamicImage) -> ImageBuffer<Luma<u8>, Vec<u8>> {
-    let luma_img = img.to_luma8();
-
-    let contrast_adjusted = adaptive_threshold(&luma_img, 2);
-
-    filter3x3(&contrast_adjusted, &[-1, -1, -1, -1, 9, -1, -1, -1, -1])
-}
-
-fn load_test_image(filename: &str) -> Result<(Vec<u8>, u32, u32), Box<dyn std::error::Error>> {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("tests");
-    path.push("test_images");
-    path.push(filename);
-
-    let img = image::open(&path)
-        .map_err(|e| format!("Failed to open test image {}: {}", path.display(), e))?
-        .to_rgb8();
-    let (width, height) = img.dimensions();
-    Ok((img.into_raw(), width, height))
-}
 
 #[test]
 fn test_multiple_languages_with_lstm() {
@@ -111,7 +49,7 @@ fn test_multiple_languages_with_lstm() {
         text
     );
 
-    let confidences = api.get_word_confidences();
+    let confidences = api.all_word_confidences();
     println!("Word confidences: {:?}", confidences);
     assert!(confidences.is_ok(), "No word confidences returned");
     assert!(
@@ -141,7 +79,7 @@ fn test_ocr_on_real_image() {
     assert!(!text.is_empty());
     assert!(text.contains("This is a sample text for OCR testing."));
 
-    let confidences = api.get_word_confidences();
+    let confidences = api.all_word_confidences();
     assert!(confidences.is_ok());
     assert!(confidences.unwrap().iter().all(|&c| c > 0));
 }
@@ -380,7 +318,7 @@ fn test_concurrent_access() {
     let mut handles = vec![];
 
     for i in 0..3 {
-        let api_clone = api.clone();
+        let api_clone = api.try_clone().unwrap();
         let handle = thread::spawn(move || {
             match i % 3 {
                 0 => {
@@ -440,7 +378,7 @@ fn test_thread_safety_with_image() {
 
     // Thread'lerde clone'lanmış API'yi kullan
     for _ in 0..3 {
-        let api_clone = api.clone(); // Bu artık tüm konfigürasyonu da kopyalayacak
+        let api_clone = api.try_clone().unwrap();
         let image_data = Arc::clone(&image_data);
 
         let handle = thread::spawn(move || {
@@ -475,7 +413,7 @@ fn test_thread_safety_init() {
 
     // Try to initialize from multiple threads
     for i in 0..3 {
-        let api_clone = api.clone();
+        let api_clone = api.try_clone().unwrap();
         let tessdata_dir = tessdata_dir.clone();
 
         let handle = thread::spawn(move || {

@@ -203,12 +203,55 @@ mod tests {
     #[test]
     fn test_page_seg_mode_from_int() {
         assert_eq!(TessPageSegMode::from_int(0), TessPageSegMode::PSM_OSD_ONLY);
+        assert_eq!(TessPageSegMode::from_int(1), TessPageSegMode::PSM_AUTO_OSD);
+        assert_eq!(
+            TessPageSegMode::from_int(2),
+            TessPageSegMode::PSM_AUTO_ONLY
+        );
         assert_eq!(TessPageSegMode::from_int(3), TessPageSegMode::PSM_AUTO);
+        assert_eq!(
+            TessPageSegMode::from_int(4),
+            TessPageSegMode::PSM_SINGLE_COLUMN
+        );
+        assert_eq!(
+            TessPageSegMode::from_int(5),
+            TessPageSegMode::PSM_SINGLE_BLOCK_VERT_TEXT
+        );
+        assert_eq!(
+            TessPageSegMode::from_int(6),
+            TessPageSegMode::PSM_SINGLE_BLOCK
+        );
+        assert_eq!(
+            TessPageSegMode::from_int(7),
+            TessPageSegMode::PSM_SINGLE_LINE
+        );
+        assert_eq!(
+            TessPageSegMode::from_int(8),
+            TessPageSegMode::PSM_SINGLE_WORD
+        );
+        assert_eq!(
+            TessPageSegMode::from_int(9),
+            TessPageSegMode::PSM_CIRCLE_WORD
+        );
         assert_eq!(
             TessPageSegMode::from_int(10),
             TessPageSegMode::PSM_SINGLE_CHAR
         );
+        assert_eq!(
+            TessPageSegMode::from_int(11),
+            TessPageSegMode::PSM_SPARSE_TEXT
+        );
+        assert_eq!(
+            TessPageSegMode::from_int(12),
+            TessPageSegMode::PSM_SPARSE_TEXT_OSD
+        );
+        assert_eq!(
+            TessPageSegMode::from_int(13),
+            TessPageSegMode::PSM_RAW_LINE
+        );
+        assert_eq!(TessPageSegMode::from_int(14), TessPageSegMode::PSM_COUNT);
         assert_eq!(TessPageSegMode::from_int(999), TessPageSegMode::PSM_AUTO); // default
+        assert_eq!(TessPageSegMode::from_int(-1), TessPageSegMode::PSM_AUTO); // negative default
     }
 
     #[test]
@@ -224,26 +267,102 @@ mod tests {
             TessPageIteratorLevel::RIL_BLOCK
         );
         assert_eq!(
+            TessPageIteratorLevel::from_int(1),
+            TessPageIteratorLevel::RIL_PARA
+        );
+        assert_eq!(
+            TessPageIteratorLevel::from_int(2),
+            TessPageIteratorLevel::RIL_TEXTLINE
+        );
+        assert_eq!(
             TessPageIteratorLevel::from_int(3),
             TessPageIteratorLevel::RIL_WORD
+        );
+        assert_eq!(
+            TessPageIteratorLevel::from_int(4),
+            TessPageIteratorLevel::RIL_SYMBOL
         );
         assert_eq!(
             TessPageIteratorLevel::from_int(-1),
             TessPageIteratorLevel::RIL_BLOCK
         ); // default
+        assert_eq!(
+            TessPageIteratorLevel::from_int(100),
+            TessPageIteratorLevel::RIL_BLOCK
+        ); // default for out-of-range
     }
 
     #[test]
     fn test_poly_block_type_from_int() {
         assert_eq!(
+            TessPolyBlockType::from_int(0),
+            TessPolyBlockType::PT_UNKNOWN
+        );
+        assert_eq!(
             TessPolyBlockType::from_int(1),
             TessPolyBlockType::PT_FLOWING_TEXT
         );
+        assert_eq!(
+            TessPolyBlockType::from_int(2),
+            TessPolyBlockType::PT_HEADING_TEXT
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(3),
+            TessPolyBlockType::PT_PULLOUT_TEXT
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(4),
+            TessPolyBlockType::PT_EQUATION
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(5),
+            TessPolyBlockType::PT_INLINE_EQUATION
+        );
         assert_eq!(TessPolyBlockType::from_int(6), TessPolyBlockType::PT_TABLE);
+        assert_eq!(
+            TessPolyBlockType::from_int(7),
+            TessPolyBlockType::PT_VERTICAL_TEXT
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(8),
+            TessPolyBlockType::PT_CAPTION_TEXT
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(9),
+            TessPolyBlockType::PT_FLOWING_IMAGE
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(10),
+            TessPolyBlockType::PT_HEADING_IMAGE
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(11),
+            TessPolyBlockType::PT_PULLOUT_IMAGE
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(12),
+            TessPolyBlockType::PT_HORZ_LINE
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(13),
+            TessPolyBlockType::PT_VERT_LINE
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(14),
+            TessPolyBlockType::PT_NOISE
+        );
+        assert_eq!(
+            TessPolyBlockType::from_int(15),
+            TessPolyBlockType::PT_COUNT
+        );
         assert_eq!(
             TessPolyBlockType::from_int(100),
             TessPolyBlockType::PT_UNKNOWN
         ); // default
+        assert_eq!(
+            TessPolyBlockType::from_int(-1),
+            TessPolyBlockType::PT_UNKNOWN
+        ); // negative default
     }
 
     #[test]
@@ -253,20 +372,40 @@ mod tests {
             TessOrientation::ORIENTATION_PAGE_UP
         );
         assert_eq!(
+            TessOrientation::from_int(1),
+            TessOrientation::ORIENTATION_PAGE_RIGHT
+        );
+        assert_eq!(
             TessOrientation::from_int(2),
             TessOrientation::ORIENTATION_PAGE_DOWN
+        );
+        assert_eq!(
+            TessOrientation::from_int(3),
+            TessOrientation::ORIENTATION_PAGE_LEFT
         );
         assert_eq!(
             TessOrientation::from_int(5),
             TessOrientation::ORIENTATION_PAGE_UP
         ); // default
+        assert_eq!(
+            TessOrientation::from_int(-1),
+            TessOrientation::ORIENTATION_PAGE_UP
+        ); // negative default
     }
 
     #[test]
     fn test_paragraph_justification_from_int() {
         assert_eq!(
+            TessParagraphJustification::from_int(0),
+            TessParagraphJustification::JUSTIFICATION_UNKNOWN
+        );
+        assert_eq!(
             TessParagraphJustification::from_int(1),
             TessParagraphJustification::JUSTIFICATION_LEFT
+        );
+        assert_eq!(
+            TessParagraphJustification::from_int(2),
+            TessParagraphJustification::JUSTIFICATION_CENTER
         );
         assert_eq!(
             TessParagraphJustification::from_int(3),
@@ -275,7 +414,11 @@ mod tests {
         assert_eq!(
             TessParagraphJustification::from_int(-1),
             TessParagraphJustification::JUSTIFICATION_UNKNOWN
-        );
+        ); // negative default
+        assert_eq!(
+            TessParagraphJustification::from_int(100),
+            TessParagraphJustification::JUSTIFICATION_UNKNOWN
+        ); // out-of-range default
     }
 
     #[test]
@@ -289,9 +432,17 @@ mod tests {
             TessWritingDirection::WRITING_DIRECTION_RIGHT_TO_LEFT
         );
         assert_eq!(
+            TessWritingDirection::from_int(2),
+            TessWritingDirection::WRITING_DIRECTION_TOP_TO_BOTTOM
+        );
+        assert_eq!(
             TessWritingDirection::from_int(10),
             TessWritingDirection::WRITING_DIRECTION_LEFT_TO_RIGHT
-        );
+        ); // default
+        assert_eq!(
+            TessWritingDirection::from_int(-1),
+            TessWritingDirection::WRITING_DIRECTION_LEFT_TO_RIGHT
+        ); // negative default
     }
 
     #[test]
@@ -301,13 +452,21 @@ mod tests {
             TessTextlineOrder::TEXTLINE_ORDER_LEFT_TO_RIGHT
         );
         assert_eq!(
+            TessTextlineOrder::from_int(1),
+            TessTextlineOrder::TEXTLINE_ORDER_RIGHT_TO_LEFT
+        );
+        assert_eq!(
             TessTextlineOrder::from_int(2),
             TessTextlineOrder::TEXTLINE_ORDER_TOP_TO_BOTTOM
         );
         assert_eq!(
             TessTextlineOrder::from_int(99),
             TessTextlineOrder::TEXTLINE_ORDER_LEFT_TO_RIGHT
-        );
+        ); // default
+        assert_eq!(
+            TessTextlineOrder::from_int(-1),
+            TessTextlineOrder::TEXTLINE_ORDER_LEFT_TO_RIGHT
+        ); // negative default
     }
 
     #[test]

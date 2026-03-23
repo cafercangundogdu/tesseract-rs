@@ -1,6 +1,7 @@
 use crate::api::TessDeleteText;
 use crate::enums::TessPageIteratorLevel;
 use crate::error::{Result, TesseractError};
+use crate::ChoiceIterator;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_float, c_int, c_void};
 use std::sync::{Arc, Mutex};
@@ -282,6 +283,27 @@ impl ResultIterator {
             Ok((left, top, right, bottom))
         }
     }
+
+    /// Gets a choice iterator for the current symbol.
+    ///
+    /// The choice iterator provides alternative recognition results
+    /// for the current symbol position.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `ChoiceIterator` if successful, otherwise returns an error.
+    pub fn get_choice_iterator(&self) -> Result<ChoiceIterator> {
+        let handle = self
+            .handle
+            .lock()
+            .map_err(|_| TesseractError::MutexLockError)?;
+        let choice_iter = unsafe { TessResultIteratorGetChoiceIterator(*handle) };
+        if choice_iter.is_null() {
+            Err(TesseractError::NullPointerError)
+        } else {
+            Ok(ChoiceIterator::new(choice_iter))
+        }
+    }
 }
 
 impl Drop for ResultIterator {
@@ -324,4 +346,5 @@ extern "C" {
         right: *mut c_int,
         bottom: *mut c_int,
     ) -> c_int;
+    pub fn TessResultIteratorGetChoiceIterator(handle: *mut c_void) -> *mut c_void;
 }

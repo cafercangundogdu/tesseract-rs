@@ -1,10 +1,8 @@
 #![cfg_attr(not(feature = "build-tesseract"), allow(unused_variables, dead_code))]
 #![allow(clippy::arc_with_non_send_sync)]
-#![allow(clippy::missing_transmute_annotations)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::new_without_default)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-#![allow(clippy::cmp_null)]
 
 //! # tesseract-rs
 //!
@@ -135,9 +133,10 @@ mod monitor;
 pub use monitor::TessMonitor;
 mod result_renderer;
 pub use result_renderer::TessResultRenderer;
-mod mutable_iterator;
-pub use mutable_iterator::MutableIterator;
 mod enums;
-pub use enums::{TessPageIteratorLevel, TessPageSegMode, TessPolyBlockType};
+pub use enums::{
+    TessOrientation, TessPageIteratorLevel, TessPageSegMode, TessParagraphJustification,
+    TessPolyBlockType, TessTextlineOrder, TessWritingDirection,
+};
 mod api;
 pub use api::TesseractAPI;

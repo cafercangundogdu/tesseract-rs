@@ -104,7 +104,7 @@ fn benchmark_api_clone(c: &mut Criterion) {
 
     c.bench_function("api_clone", |b| {
         b.iter(|| {
-            let _cloned = black_box(api.clone());
+            let _cloned = black_box(api.try_clone().unwrap());
         });
     });
 }

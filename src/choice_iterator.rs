@@ -1,4 +1,3 @@
-use crate::api::TessDeleteText;
 use crate::error::{Result, TesseractError};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_float, c_int, c_void};
@@ -52,7 +51,9 @@ impl ChoiceIterator {
         }
         let c_str = unsafe { CStr::from_ptr(text_ptr) };
         let result = c_str.to_str()?.to_owned();
-        unsafe { TessDeleteText(text_ptr) };
+        // Note: TessChoiceIteratorGetUTF8Text returns a pointer to internal data
+        // that must NOT be freed by the caller. The memory is owned by the
+        // ChoiceIterator and will be cleaned up when it is deleted.
         Ok(result)
     }
 
@@ -78,9 +79,11 @@ impl Drop for ChoiceIterator {
     }
 }
 
+#[cfg(feature = "build-tesseract")]
+#[link(name = "tesseract")]
 extern "C" {
     fn TessChoiceIteratorDelete(handle: *mut c_void);
     fn TessChoiceIteratorNext(handle: *mut c_void) -> c_int;
-    fn TessChoiceIteratorGetUTF8Text(handle: *mut c_void) -> *mut c_char;
+    fn TessChoiceIteratorGetUTF8Text(handle: *mut c_void) -> *const c_char;
     fn TessChoiceIteratorConfidence(handle: *mut c_void) -> c_float;
 }

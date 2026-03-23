@@ -1,6 +1,6 @@
 {
   "name": "tesseract-rs",
-  "version": "0.1.20",
+  "version": "0.2.0",
   "private": true,
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",

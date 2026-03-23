@@ -28,8 +28,6 @@ pub enum TesseractError {
     ProcessPagesError,
     #[error("I/O error")]
     IoError,
-    #[error("Mutex error")]
-    MutexError,
     #[error("Invalid dimensions")]
     InvalidDimensions,
     #[error("Invalid bytes per pixel")]
@@ -50,15 +48,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_error_display() {
-        let error = TesseractError::InitError;
-        assert_eq!(error.to_string(), "Failed to initialize Tesseract");
-
-        let error = TesseractError::SetImageError;
-        assert_eq!(error.to_string(), "Failed to set image");
-
-        let error = TesseractError::OcrError;
-        assert_eq!(error.to_string(), "OCR operation failed");
+    fn test_all_error_display() {
+        let cases = vec![
+            (TesseractError::InitError, "Failed to initialize Tesseract"),
+            (TesseractError::SetImageError, "Failed to set image"),
+            (TesseractError::OcrError, "OCR operation failed"),
+            (TesseractError::MutexLockError, "Failed to lock mutex"),
+            (TesseractError::SetVariableError, "Failed to set variable"),
+            (TesseractError::GetVariableError, "Failed to get variable"),
+            (TesseractError::NullPointerError, "Null pointer error"),
+            (TesseractError::InvalidParameterError, "Invalid parameter"),
+            (TesseractError::AnalyseLayoutError, "Layout analysis failed"),
+            (TesseractError::ProcessPagesError, "Page processing failed"),
+            (TesseractError::IoError, "I/O error"),
+            (TesseractError::InvalidDimensions, "Invalid dimensions"),
+            (
+                TesseractError::InvalidBytesPerPixel,
+                "Invalid bytes per pixel",
+            ),
+            (
+                TesseractError::InvalidBytesPerLine,
+                "Invalid bytes per line",
+            ),
+            (TesseractError::InvalidImageData, "Invalid image data"),
+            (TesseractError::UninitializedError, "Uninitialized error"),
+        ];
+        for (error, expected) in cases {
+            assert_eq!(error.to_string(), expected, "Mismatch for {:?}", error);
+        }
     }
 
     #[test]
