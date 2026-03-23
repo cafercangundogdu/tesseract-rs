@@ -60,10 +60,7 @@ fn test_e2e_word_iteration_with_bounds() {
         if let Ok((text, left, top, right, bottom, confidence)) = iter.get_word_with_bounds() {
             words.push((text, left, top, right, bottom, confidence));
         }
-        if !iter
-            .next(TessPageIteratorLevel::RIL_WORD)
-            .unwrap_or(false)
-        {
+        if !iter.next(TessPageIteratorLevel::RIL_WORD).unwrap_or(false) {
             break;
         }
     }
@@ -220,16 +217,10 @@ fn test_e2e_full_pipeline() {
     let iter = api.get_iterator().unwrap();
     let mut word_count = 0;
     loop {
-        if iter
-            .get_utf8_text(TessPageIteratorLevel::RIL_WORD)
-            .is_ok()
-        {
+        if iter.get_utf8_text(TessPageIteratorLevel::RIL_WORD).is_ok() {
             word_count += 1;
         }
-        if !iter
-            .next(TessPageIteratorLevel::RIL_WORD)
-            .unwrap_or(false)
-        {
+        if !iter.next(TessPageIteratorLevel::RIL_WORD).unwrap_or(false) {
             break;
         }
     }
@@ -238,8 +229,7 @@ fn test_e2e_full_pipeline() {
 
     // Render to text file
     let tmp = std::env::temp_dir().join("tesseract_e2e_pipeline");
-    let renderer =
-        TessResultRenderer::new_text_renderer(tmp.to_str().unwrap()).unwrap();
+    let renderer = TessResultRenderer::new_text_renderer(tmp.to_str().unwrap()).unwrap();
     renderer.begin_document("E2E Test").unwrap();
     renderer.add_image(&api).unwrap();
     renderer.end_document().unwrap();

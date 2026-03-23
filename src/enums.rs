@@ -204,10 +204,7 @@ mod tests {
     fn test_page_seg_mode_from_int() {
         assert_eq!(TessPageSegMode::from_int(0), TessPageSegMode::PSM_OSD_ONLY);
         assert_eq!(TessPageSegMode::from_int(1), TessPageSegMode::PSM_AUTO_OSD);
-        assert_eq!(
-            TessPageSegMode::from_int(2),
-            TessPageSegMode::PSM_AUTO_ONLY
-        );
+        assert_eq!(TessPageSegMode::from_int(2), TessPageSegMode::PSM_AUTO_ONLY);
         assert_eq!(TessPageSegMode::from_int(3), TessPageSegMode::PSM_AUTO);
         assert_eq!(
             TessPageSegMode::from_int(4),
@@ -245,10 +242,7 @@ mod tests {
             TessPageSegMode::from_int(12),
             TessPageSegMode::PSM_SPARSE_TEXT_OSD
         );
-        assert_eq!(
-            TessPageSegMode::from_int(13),
-            TessPageSegMode::PSM_RAW_LINE
-        );
+        assert_eq!(TessPageSegMode::from_int(13), TessPageSegMode::PSM_RAW_LINE);
         assert_eq!(TessPageSegMode::from_int(14), TessPageSegMode::PSM_COUNT);
         assert_eq!(TessPageSegMode::from_int(999), TessPageSegMode::PSM_AUTO); // default
         assert_eq!(TessPageSegMode::from_int(-1), TessPageSegMode::PSM_AUTO); // negative default
@@ -347,14 +341,8 @@ mod tests {
             TessPolyBlockType::from_int(13),
             TessPolyBlockType::PT_VERT_LINE
         );
-        assert_eq!(
-            TessPolyBlockType::from_int(14),
-            TessPolyBlockType::PT_NOISE
-        );
-        assert_eq!(
-            TessPolyBlockType::from_int(15),
-            TessPolyBlockType::PT_COUNT
-        );
+        assert_eq!(TessPolyBlockType::from_int(14), TessPolyBlockType::PT_NOISE);
+        assert_eq!(TessPolyBlockType::from_int(15), TessPolyBlockType::PT_COUNT);
         assert_eq!(
             TessPolyBlockType::from_int(100),
             TessPolyBlockType::PT_UNKNOWN

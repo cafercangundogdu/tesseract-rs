@@ -631,7 +631,10 @@ fn test_get_thresholded_image() {
     let pix = api
         .get_thresholded_image()
         .expect("get_thresholded_image failed");
-    assert!(!pix.is_null(), "thresholded image pointer should not be null");
+    assert!(
+        !pix.is_null(),
+        "thresholded image pointer should not be null"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -681,13 +684,10 @@ fn test_set_and_get_input_image() {
         .expect("get_thresholded_image failed");
 
     // Set it as the input image
-    api.set_input_image(pix)
-        .expect("set_input_image failed");
+    api.set_input_image(pix).expect("set_input_image failed");
 
     // Get it back
-    let retrieved = api
-        .get_input_image()
-        .expect("get_input_image failed");
+    let retrieved = api.get_input_image().expect("get_input_image failed");
     assert!(
         !retrieved.is_null(),
         "get_input_image should return non-null after set_input_image"
@@ -937,10 +937,7 @@ fn test_print_variables_to_file_success() {
     if result.is_ok() {
         let contents =
             std::fs::read_to_string(&tmp_path).expect("Should be able to read output file");
-        assert!(
-            !contents.is_empty(),
-            "Output file should not be empty"
-        );
+        assert!(!contents.is_empty(), "Output file should not be empty");
     }
     let _ = std::fs::remove_file(&tmp_path);
 }
@@ -1051,9 +1048,7 @@ fn test_get_available_languages_after_init_1() {
 #[test]
 fn test_analyse_layout_returns_iterator() {
     let api = create_api_with_image();
-    let page_iter = api
-        .analyse_layout()
-        .expect("analyse_layout failed");
+    let page_iter = api.analyse_layout().expect("analyse_layout failed");
     // Just verify the iterator is usable (not null internally)
     drop(page_iter);
 }
@@ -1064,9 +1059,7 @@ fn test_analyse_layout_returns_iterator() {
 #[test]
 fn test_get_iterators_produces_valid_iterators() {
     let api = create_api_with_image();
-    let (page_iter, result_iter) = api
-        .get_iterators()
-        .expect("get_iterators failed");
+    let (page_iter, result_iter) = api.get_iterators().expect("get_iterators failed");
     // Dropping both should not crash
     drop(page_iter);
     drop(result_iter);
