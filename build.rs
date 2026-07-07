@@ -7,11 +7,13 @@ mod build_tesseract {
     use std::fs;
     use std::path::{Path, PathBuf};
 
-    // Use specific release versions for stability
+    // Use specific release versions for stability.
+    // NOTE: when bumping these, also update the Windows library name variants
+    // in build_or_use_cached() (leptonica-<ver>.lib and tesseract<MAJ><MIN>.lib).
     const LEPTONICA_URL: &str =
-        "https://github.com/DanBloomberg/leptonica/archive/refs/tags/1.84.1.zip";
+        "https://github.com/DanBloomberg/leptonica/archive/refs/tags/1.87.0.zip";
     const TESSERACT_URL: &str =
-        "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.3.4.zip";
+        "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.2.zip";
 
     pub fn get_custom_out_dir() -> PathBuf {
         if cfg!(target_os = "macos") {
@@ -518,14 +520,15 @@ mod build_tesseract {
                     "leptonica.lib".to_string(),
                     "libleptonica.lib".to_string(),
                     "leptonica-static.lib".to_string(),
-                    "leptonica-1.84.1.lib".to_string(),
+                    "leptonica-1.87.0.lib".to_string(),
                 ],
                 "tesseract" => vec![
                     "tesseract.lib".to_string(),
                     "libtesseract.lib".to_string(),
                     "tesseract-static.lib".to_string(),
-                    "tesseract53.lib".to_string(),
+                    "tesseract55.lib".to_string(),
                     "tesseract54.lib".to_string(),
+                    "tesseract53.lib".to_string(),
                 ],
                 _ => vec![format!("{}.lib", name)],
             }
@@ -604,9 +607,9 @@ mod build_tesseract {
 
         // For Windows, try alternative names if primary fails
         if cfg!(target_os = "windows") && name == "leptonica" {
-            println!("cargo:rustc-link-lib=static=leptonica-1.84.1");
+            println!("cargo:rustc-link-lib=static=leptonica-1.87.0");
         } else if cfg!(target_os = "windows") && name == "tesseract" {
-            println!("cargo:rustc-link-lib=static=tesseract53");
+            println!("cargo:rustc-link-lib=static=tesseract55");
         }
     }
 }
