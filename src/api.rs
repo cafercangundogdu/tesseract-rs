@@ -190,7 +190,13 @@ impl TesseractAPI {
             .handle
             .lock()
             .map_err(|_| TesseractError::MutexLockError)?;
-        Ok(unsafe { TessBaseAPIGetIntVariable(*handle, name.as_ptr()) })
+        let mut value: c_int = 0;
+        let ok = unsafe { TessBaseAPIGetIntVariable(*handle, name.as_ptr(), &mut value) };
+        if ok != 0 {
+            Ok(value)
+        } else {
+            Err(TesseractError::GetVariableError)
+        }
     }
 
     /// Gets a boolean variable.
@@ -208,7 +214,13 @@ impl TesseractAPI {
             .handle
             .lock()
             .map_err(|_| TesseractError::MutexLockError)?;
-        Ok(unsafe { TessBaseAPIGetBoolVariable(*handle, name.as_ptr()) } != 0)
+        let mut value: c_int = 0;
+        let ok = unsafe { TessBaseAPIGetBoolVariable(*handle, name.as_ptr(), &mut value) };
+        if ok != 0 {
+            Ok(value != 0)
+        } else {
+            Err(TesseractError::GetVariableError)
+        }
     }
 
     /// Gets a double variable.
@@ -226,7 +238,13 @@ impl TesseractAPI {
             .handle
             .lock()
             .map_err(|_| TesseractError::MutexLockError)?;
-        Ok(unsafe { TessBaseAPIGetDoubleVariable(*handle, name.as_ptr()) })
+        let mut value: c_double = 0.0;
+        let ok = unsafe { TessBaseAPIGetDoubleVariable(*handle, name.as_ptr(), &mut value) };
+        if ok != 0 {
+            Ok(value)
+        } else {
+            Err(TesseractError::GetVariableError)
+        }
     }
 
     /// Sets the page segmentation mode.
@@ -1454,9 +1472,21 @@ extern "C" {
         value: *const c_char,
     ) -> c_int;
     fn TessBaseAPIGetStringVariable(handle: *mut c_void, name: *const c_char) -> *const c_char;
-    fn TessBaseAPIGetIntVariable(handle: *mut c_void, name: *const c_char) -> c_int;
-    fn TessBaseAPIGetBoolVariable(handle: *mut c_void, name: *const c_char) -> c_int;
-    fn TessBaseAPIGetDoubleVariable(handle: *mut c_void, name: *const c_char) -> c_double;
+    fn TessBaseAPIGetIntVariable(
+        handle: *mut c_void,
+        name: *const c_char,
+        value: *mut c_int,
+    ) -> c_int;
+    fn TessBaseAPIGetBoolVariable(
+        handle: *mut c_void,
+        name: *const c_char,
+        value: *mut c_int,
+    ) -> c_int;
+    fn TessBaseAPIGetDoubleVariable(
+        handle: *mut c_void,
+        name: *const c_char,
+        value: *mut c_double,
+    ) -> c_int;
     fn TessBaseAPISetPageSegMode(handle: *mut c_void, mode: c_int);
     fn TessBaseAPIGetPageSegMode(handle: *mut c_void) -> c_int;
     fn TessBaseAPIRecognize(handle: *mut c_void, monitor: *mut c_void) -> c_int;
@@ -1653,20 +1683,10 @@ extern "C" {
         raw_image: c_int,
         raw_padding: c_int,
         pixa: *mut *mut c_void,
+        blockids: *mut *mut c_int,
+        paraids: *mut *mut c_int,
     ) -> *mut c_void;
-    fn TessBaseAPIProcessPagesWithOptions(
-        handle: *mut c_void,
-        filename: *const c_char,
-        retry_config: *const c_char,
-        timeout_millisec: c_int,
-        renderer: *mut c_void,
-    ) -> *mut c_char;
     fn TessBaseAPIOem(handle: *mut c_void) -> c_int;
-    fn TessBaseAPIGetBlockTextOrientations(
-        handle: *mut c_void,
-        block_orientation: *mut *mut c_int,
-        vertical_writing: *mut bool,
-    );
     fn TessPageIteratorCopy(handle: *mut c_void) -> *mut c_void;
     fn TessPageIteratorGetBinaryImage(handle: *mut c_void, level: c_int) -> *mut c_void;
     fn TessPageIteratorGetImage(

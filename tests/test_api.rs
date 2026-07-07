@@ -53,44 +53,37 @@ fn test_get_string_variable() {
 #[test]
 fn test_get_int_variable() {
     let api = create_initialized_api();
-    // "editor_image_word_bb_color" is a known int variable in Tesseract
-    let val = api.get_int_variable("editor_image_word_bb_color");
-    // Just verify it doesn't crash and returns a result
-    assert!(
-        val.is_ok(),
-        "get_int_variable should succeed for a known int variable"
-    );
+    // Registered int parameter (default 10 in Tesseract). Before the FFI fix
+    // this returned the BOOL success flag (0/1); now it returns the real value.
+    let val = api
+        .get_int_variable("edges_max_children_per_outline")
+        .expect("get_int_variable should succeed for a known int variable");
+    assert_eq!(val, 10);
 }
 
 // ---------------------------------------------------------------------------
-// 5. get_bool_variable()
+// 5. get_bool_variable()  (re-enabled after the FFI signature fix)
 // ---------------------------------------------------------------------------
-// NOTE: Skipped - TessBaseAPIGetBoolVariable FFI binding has incorrect
-// signature (missing output pointer parameter), causing SIGSEGV.
-// This is a known wrapper bug. Uncomment when the FFI binding is fixed.
-// #[test]
-// fn test_get_bool_variable() {
-//     let api = create_initialized_api();
-//     let val = api
-//         .get_bool_variable("tessedit_ambigs_training")
-//         .expect("get_bool_variable failed");
-//     assert!(!val, "tessedit_ambigs_training default should be false");
-// }
+#[test]
+fn test_get_bool_variable() {
+    let api = create_initialized_api();
+    let val = api
+        .get_bool_variable("tessedit_ambigs_training")
+        .expect("get_bool_variable failed");
+    assert!(!val, "tessedit_ambigs_training default should be false");
+}
 
 // ---------------------------------------------------------------------------
-// 6. get_double_variable()
+// 6. get_double_variable()  (re-enabled after the FFI signature fix)
 // ---------------------------------------------------------------------------
-// NOTE: Skipped - TessBaseAPIGetDoubleVariable FFI binding has incorrect
-// signature (missing output pointer parameter), causing SIGSEGV.
-// This is a known wrapper bug. Uncomment when the FFI binding is fixed.
-// #[test]
-// fn test_get_double_variable() {
-//     let api = create_initialized_api();
-//     let val = api
-//         .get_double_variable("tessedit_reject_doc_percent")
-//         .expect("get_double_variable failed");
-//     assert!(val.is_finite(), "Should return a finite f64, got {}", val);
-// }
+#[test]
+fn test_get_double_variable() {
+    let api = create_initialized_api();
+    let val = api
+        .get_double_variable("tessedit_reject_doc_percent")
+        .expect("get_double_variable failed");
+    assert!(val.is_finite(), "Should return a finite f64, got {}", val);
+}
 
 // ---------------------------------------------------------------------------
 // 7. set_page_seg_mode / get_page_seg_mode roundtrip
