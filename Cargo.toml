@@ -18,24 +18,26 @@ keywords = [
 categories = ["external-ffi-bindings", "computer-vision", "text-processing"]
 build = "build.rs"
 links = "tesseract"
-rust-version = "1.83.0"
+rust-version = "1.88"
 exclude = ["tessdata/*", "third_party/*"]
 
 [dependencies]
-libc = "0.2.174"
-thiserror = "1.0.69"
+libc = "0.2.186"
+thiserror = "2.0.18"
 
 [dev-dependencies]
-image = "0.25.6"
-imageproc = "0.25.0"
-criterion = { version = "0.7.0", features = ["html_reports"] }
+image = "0.25.10"
+imageproc = "0.27.0"
+criterion = { version = "0.8.2", features = ["html_reports"] }
 
 [build-dependencies]
-cc = { version = "1.2.30", optional = true }
-glob = { version = "0.3.2", optional = true }
-cmake = { version = "0.1.54", optional = true }
-reqwest = { version = "0.12.22", features = ["blocking"], optional = true }
-zip = { version = "7.2.0", default-features = false, features = ["deflate"], optional = true }
+cc = { version = "1.2.66", optional = true }
+glob = { version = "0.3.3", optional = true }
+cmake = { version = "0.1.58", optional = true }
+reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
+zip = { version = "8.6.0", default-features = false, features = [
+    "deflate",
+], optional = true }
 
 
 [features]

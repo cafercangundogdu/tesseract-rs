@@ -24,7 +24,9 @@ jobs:
           release: "14.3"
           usesh: true
           prepare: |
-            pkg install -y cmake rust pkgconf
+            # ca_root_nss: reqwest 0.13 defaults to rustls, which needs OS root
+            # CAs to download the tesseract/leptonica source over HTTPS.
+            pkg install -y cmake rust pkgconf ca_root_nss
           run: |
             set -e
             # The repo's .cargo/config.toml sets rustc-wrapper=sccache, which is
