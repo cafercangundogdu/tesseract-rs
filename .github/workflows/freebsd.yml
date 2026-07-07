@@ -1,0 +1,36 @@
+name: FreeBSD
+
+# GitHub-hosted runners have no FreeBSD image, so we run the build and tests
+# inside a real FreeBSD VM (QEMU) on an ubuntu-latest runner via
+# vmactions/freebsd-vm. This makes FreeBSD a first-class CI target alongside
+# Linux/macOS/Windows.
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  workflow_dispatch:
+
+jobs:
+  freebsd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & test in FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.3"
+          usesh: true
+          prepare: |
+            pkg install -y cmake rust pkgconf
+          run: |
+            set -e
+            # The repo's .cargo/config.toml sets rustc-wrapper=sccache, which is
+            # not installed in the VM; disable it exactly like rust.yml does.
+            export RUSTC_WRAPPER=""
+            export CARGO_INCREMENTAL=0
+            echo "=== FreeBSD $(freebsd-version) / $(rustc --version) ==="
+            cargo build --verbose
+            cargo test --verbose

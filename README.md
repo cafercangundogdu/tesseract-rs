@@ -9,7 +9,8 @@
 - Automatic download of Tesseract training data (English and Turkish)
 - High-level Rust API for common OCR tasks
 - Caching of compiled libraries for faster subsequent builds
-- Support for multiple operating systems (Linux, macOS, Windows)
+- Support for multiple operating systems (Linux, macOS, Windows, FreeBSD)
+- Optional embedded tessdata for single-binary deployment
 
 ## Installation
 
@@ -17,7 +18,24 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.1.20", features = ["build-tesseract"] }
+tesseract-rs = { version = "0.1.22", features = ["build-tesseract"] }
+```
+
+For single-binary deployment with embedded tessdata:
+
+```toml
+[dependencies]
+tesseract-rs = { version = "0.1.22", features = ["embed-tessdata"] }
+```
+
+By default, both English and Turkish tessdata are embedded. To embed only specific languages, set the `TESSERACT_EMBED_LANGUAGES` environment variable during build:
+
+```bash
+# Embed only English
+TESSERACT_EMBED_LANGUAGES=eng cargo build --features embed-tessdata
+
+# Embed multiple languages
+TESSERACT_EMBED_LANGUAGES=eng,fra,deu cargo build --features embed-tessdata
 ```
 
 For development and testing, you'll also need these dependencies:
@@ -58,6 +76,7 @@ The crate uses the following directory structure based on your operating system:
 
 - macOS: `~/Library/Application Support/tesseract-rs`
 - Linux: `~/.tesseract-rs`
+- FreeBSD: `~/.tesseract-rs`
 - Windows: `%APPDATA%/tesseract-rs`
 
 The cache includes:
@@ -127,6 +146,11 @@ fn get_default_tessdata_dir() -> PathBuf {
             .join("tesseract-rs")
             .join("tessdata")
     } else if cfg!(target_os = "linux") {
+        let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+        PathBuf::from(home_dir)
+            .join(".tesseract-rs")
+            .join("tessdata")
+    } else if cfg!(target_os = "freebsd") {
         let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
         PathBuf::from(home_dir)
             .join(".tesseract-rs")
@@ -219,6 +243,74 @@ fn main() -> Result<(), Box<dyn Error>> {
     api.set_variable("tessedit_pageseg_mode", "10")?;
 
     // Get the recognized text
+    let text = api.get_utf8_text()?;
+    println!("Recognized text: {}", text.trim());
+
+    Ok(())
+}
+```
+
+## Embedded Tessdata Usage
+
+When using the `embed-tessdata` feature, tessdata files are embedded directly into your binary, eliminating the need to ship separate tessdata files:
+
+```rust
+use tesseract_rs::TesseractAPI;
+use std::error::Error;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let api = TesseractAPI::new()?;
+    
+    // Initialize with embedded tessdata - no external files needed!
+    api.init_embedded("eng")?;
+    
+    // Check what languages are available
+    let available_languages = api.embedded_languages();
+    println!("Available embedded languages: {:?}", available_languages);
+    
+    let width = 24;
+    let height = 24;
+    let bytes_per_pixel = 1;
+    let bytes_per_line = width * bytes_per_pixel;
+
+    // Create simple test image
+    let mut image_data = vec![255u8; width * height];
+    
+    // Draw a simple "9"
+    for y in 4..19 {
+        for x in 7..17 {
+            if y == 4 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+            if y >= 4 && y <= 10 && x == 7 {
+                image_data[y * width + x] = 0;
+            }
+            if y >= 4 && y <= 11 && x == 16 {
+                image_data[y * width + x] = 0;
+            }
+            if y == 11 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+            if y >= 11 && y <= 18 && x == 16 {
+                image_data[y * width + x] = 0;
+            }
+            if y == 18 && x >= 8 && x <= 15 {
+                image_data[y * width + x] = 0;
+            }
+        }
+    }
+
+    api.set_image(
+        &image_data,
+        width.try_into().unwrap(),
+        height.try_into().unwrap(),
+        bytes_per_pixel.try_into().unwrap(),
+        bytes_per_line.try_into().unwrap(),
+    )?;
+
+    api.set_variable("tessedit_char_whitelist", "0123456789")?;
+    api.set_variable("tessedit_pageseg_mode", "10")?;
+
     let text = api.get_utf8_text()?;
     println!("Recognized text: {}", text.trim());
 

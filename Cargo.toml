@@ -41,6 +41,7 @@ zip = { version = "7.2.0", default-features = false, features = ["deflate"], opt
 [features]
 default = ["build-tesseract"]
 build-tesseract = ["cc", "glob", "cmake", "reqwest", "zip"]
+embed-tessdata = ["build-tesseract"]
 
 [package.metadata.docs.rs]
 features = ["docs-only"]
@@ -53,3 +54,7 @@ crate-type = ["lib"]
 [[bench]]
 name = "ocr_benchmark"
 harness = false
+
+[[example]]
+name = "embedded_example"
+required-features = ["embed-tessdata"]

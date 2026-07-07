@@ -13,7 +13,7 @@ mod build_tesseract {
     const TESSERACT_URL: &str =
         "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.3.4.zip";
 
-    fn get_custom_out_dir() -> PathBuf {
+    pub fn get_custom_out_dir() -> PathBuf {
         if cfg!(target_os = "macos") {
             let home_dir = env::var("HOME").unwrap_or_else(|_| {
                 env::var("USER")
@@ -25,6 +25,13 @@ mod build_tesseract {
                 .join("Application Support")
                 .join("tesseract-rs")
         } else if cfg!(target_os = "linux") {
+            let home_dir = env::var("HOME").unwrap_or_else(|_| {
+                env::var("USER")
+                    .map(|user| format!("/home/{}", user))
+                    .expect("Neither HOME nor USER environment variable set")
+            });
+            PathBuf::from(home_dir).join(".tesseract-rs")
+        } else if cfg!(target_os = "freebsd") {
             let home_dir = env::var("HOME").unwrap_or_else(|_| {
                 env::var("USER")
                     .map(|user| format!("/home/{}", user))
@@ -308,6 +315,11 @@ mod build_tesseract {
                 // Assume GCC
                 additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "g++".to_string()));
             }
+        } else if cfg!(target_os = "freebsd") {
+            cmake_cxx_flags.push_str("-std=c++11 ");
+            // FreeBSD typically uses clang by default
+            cmake_cxx_flags.push_str("-stdlib=libc++ ");
+            additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "clang++".to_string()));
         } else if cfg!(target_os = "windows") {
             // Windows-specific MSVC flags
             cmake_cxx_flags.push_str("/EHsc /MP /std:c++17 ");
@@ -349,6 +361,10 @@ mod build_tesseract {
             println!("cargo:rustc-link-lib=pthread");
             println!("cargo:rustc-link-lib=m");
             println!("cargo:rustc-link-lib=dl");
+        } else if cfg!(target_os = "freebsd") {
+            println!("cargo:rustc-link-lib=c++");
+            println!("cargo:rustc-link-lib=pthread");
+            println!("cargo:rustc-link-lib=m");
         } else if cfg!(target_os = "windows") {
             // Additional linker flags are generally not required for Windows,
             // as MSVC automatically links the necessary libraries.
@@ -598,4 +614,69 @@ mod build_tesseract {
 fn main() {
     #[cfg(feature = "build-tesseract")]
     build_tesseract::build();
+
+    #[cfg(feature = "embed-tessdata")]
+    generate_embedded_tessdata();
+}
+
+#[cfg(feature = "embed-tessdata")]
+fn generate_embedded_tessdata() {
+    use std::fs;
+    use std::path::Path;
+
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let tessdata_dir = build_tesseract::get_custom_out_dir().join("tessdata");
+
+    let mut embedded_code = String::new();
+    embedded_code.push_str("// Auto-generated embedded tessdata\n");
+    embedded_code.push_str("use std::collections::HashMap;\n\n");
+    embedded_code.push_str("pub struct EmbeddedTessdata {\n");
+    embedded_code.push_str("    data: HashMap<&'static str, &'static [u8]>,\n");
+    embedded_code.push_str("}\n\n");
+    embedded_code.push_str("impl EmbeddedTessdata {\n");
+    embedded_code.push_str("    pub fn new() -> Self {\n");
+    embedded_code.push_str("        let mut data = HashMap::new();\n");
+
+    // Embed language files based on environment variables
+    let embed_languages =
+        std::env::var("TESSERACT_EMBED_LANGUAGES").unwrap_or_else(|_| "eng,tur".to_string());
+
+    let languages: Vec<&str> = embed_languages.split(',').map(|s| s.trim()).collect();
+
+    for lang in &languages {
+        let traineddata_file = tessdata_dir.join(format!("{}.traineddata", lang));
+        if traineddata_file.exists() {
+            embedded_code.push_str(&format!(
+                "        data.insert(\"{}\", include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{}.traineddata\")) as &'static [u8]);\n",
+                lang, lang
+            ));
+
+            // Copy the file to OUT_DIR so include_bytes! can find it
+            let dest = Path::new(&out_dir).join(format!("{}.traineddata", lang));
+            if let Err(e) = fs::copy(&traineddata_file, &dest) {
+                println!("cargo:warning=Failed to copy {}.traineddata: {}", lang, e);
+            }
+        } else {
+            println!(
+                "cargo:warning=Language {} not found in tessdata directory",
+                lang
+            );
+        }
+    }
+
+    embedded_code.push_str("        Self { data }\n");
+    embedded_code.push_str("    }\n\n");
+    embedded_code.push_str("    pub fn get(&self, language: &str) -> Option<&'static [u8]> {\n");
+    embedded_code.push_str("        self.data.get(language).copied()\n");
+    embedded_code.push_str("    }\n\n");
+    embedded_code.push_str("    pub fn available_languages(&self) -> Vec<&'static str> {\n");
+    embedded_code.push_str("        self.data.keys().copied().collect()\n");
+    embedded_code.push_str("    }\n");
+    embedded_code.push_str("}\n\n");
+    embedded_code.push_str("pub static EMBEDDED_TESSDATA: std::sync::LazyLock<EmbeddedTessdata> = std::sync::LazyLock::new(|| EmbeddedTessdata::new());\n");
+
+    let embedded_file = Path::new(&out_dir).join("embedded_tessdata.rs");
+    fs::write(&embedded_file, embedded_code).expect("Failed to write embedded tessdata file");
+
+    println!("cargo:rerun-if-changed={}", tessdata_dir.display());
 }
