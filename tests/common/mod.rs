@@ -2,7 +2,8 @@
 
 use image::{DynamicImage, ImageBuffer, Luma};
 use imageproc::contrast::adaptive_threshold;
-use imageproc::filter::filter3x3;
+use imageproc::filter::filter_clamped;
+use imageproc::kernel::Kernel;
 use std::path::PathBuf;
 use tesseract_rs::TesseractAPI;
 
@@ -42,8 +43,11 @@ pub fn get_tessdata_dir() -> PathBuf {
 
 pub fn preprocess_image(img: &DynamicImage) -> ImageBuffer<Luma<u8>, Vec<u8>> {
     let luma_img = img.to_luma8();
-    let contrast_adjusted = adaptive_threshold(&luma_img, 2);
-    filter3x3(&contrast_adjusted, &[-1, -1, -1, -1, 9, -1, -1, -1, -1])
+    // imageproc 0.27: adaptive_threshold gained a `delta` arg (0 keeps prior behavior).
+    let contrast_adjusted = adaptive_threshold(&luma_img, 2, 0);
+    // imageproc 0.27: filter3x3 was removed in favor of filter_clamped + Kernel.
+    let sharpen = Kernel::new(&[-1i32, -1, -1, -1, 9, -1, -1, -1, -1], 3, 3);
+    filter_clamped::<_, i32, u8>(&contrast_adjusted, sharpen)
 }
 
 pub fn load_test_image(
