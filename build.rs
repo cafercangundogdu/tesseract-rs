@@ -302,9 +302,9 @@ mod build_tesseract {
 
         if cfg!(target_os = "macos") {
             cmake_cxx_flags.push_str("-stdlib=libc++ ");
-            cmake_cxx_flags.push_str("-std=c++11 ");
+            cmake_cxx_flags.push_str("-std=c++17 ");
         } else if cfg!(target_os = "linux") {
-            cmake_cxx_flags.push_str("-std=c++11 ");
+            cmake_cxx_flags.push_str("-std=c++17 ");
             // Check if we're on a system using clang
             if cfg!(target_env = "musl")
                 || env::var("CC")
@@ -318,7 +318,7 @@ mod build_tesseract {
                 additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "g++".to_string()));
             }
         } else if cfg!(target_os = "freebsd") {
-            cmake_cxx_flags.push_str("-std=c++11 ");
+            cmake_cxx_flags.push_str("-std=c++17 ");
             // FreeBSD typically uses clang by default
             cmake_cxx_flags.push_str("-stdlib=libc++ ");
             additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "clang++".to_string()));
@@ -516,11 +516,15 @@ mod build_tesseract {
         // For Windows, check multiple possible library names
         let possible_lib_names: Vec<String> = if cfg!(target_os = "windows") {
             match name {
+                // MSVC debug builds append a "d" suffix to the library name, so
+                // list both release and debug variants (see issue #17).
                 "leptonica" => vec![
                     "leptonica.lib".to_string(),
                     "libleptonica.lib".to_string(),
                     "leptonica-static.lib".to_string(),
                     "leptonica-1.87.0.lib".to_string(),
+                    "leptonica-1.87.0d.lib".to_string(),
+                    "leptonicad.lib".to_string(),
                 ],
                 "tesseract" => vec![
                     "tesseract.lib".to_string(),
@@ -529,6 +533,9 @@ mod build_tesseract {
                     "tesseract55.lib".to_string(),
                     "tesseract54.lib".to_string(),
                     "tesseract53.lib".to_string(),
+                    "tesseract55d.lib".to_string(),
+                    "tesseract54d.lib".to_string(),
+                    "tesseract53d.lib".to_string(),
                 ],
                 _ => vec![format!("{}.lib", name)],
             }
@@ -603,14 +610,11 @@ mod build_tesseract {
             install_dir.join("lib").display()
         );
 
+        // The actual built library (any of possible_lib_names, including the
+        // MSVC debug "d"-suffixed variant) is copied to the generic
+        // "{name}.lib" / "lib{name}.a" above, so a single generic link works
+        // for both debug and release without hardcoding a versioned name.
         println!("cargo:rustc-link-lib=static={}", name);
-
-        // For Windows, try alternative names if primary fails
-        if cfg!(target_os = "windows") && name == "leptonica" {
-            println!("cargo:rustc-link-lib=static=leptonica-1.87.0");
-        } else if cfg!(target_os = "windows") && name == "tesseract" {
-            println!("cargo:rustc-link-lib=static=tesseract55");
-        }
     }
 }
 
