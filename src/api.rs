@@ -1104,6 +1104,10 @@ impl TesseractAPI {
                 oem,
                 config_ptr_ptrs.as_ptr(),
                 config_ptrs.len() as c_int,
+                std::ptr::null(),
+                std::ptr::null(),
+                0,
+                0,
             )
         };
         if result != 0 {
@@ -1150,6 +1154,10 @@ impl TesseractAPI {
                 oem,
                 config_ptr_ptrs.as_ptr(),
                 config_ptrs.len() as c_int,
+                std::ptr::null(),
+                std::ptr::null(),
+                0,
+                0,
             )
         };
         if result != 0 {
@@ -1521,6 +1529,10 @@ extern "C" {
         oem: c_int,
         configs: *const *const c_char,
         configs_size: c_int,
+        vars_vec: *const *const c_char,
+        vars_values: *const *const c_char,
+        vars_vec_size: usize,
+        set_only_non_debug_params: c_int,
     ) -> c_int;
     fn TessBaseAPIInit5(
         handle: *mut c_void,
@@ -1530,6 +1542,10 @@ extern "C" {
         oem: c_int,
         configs: *const *const c_char,
         configs_size: c_int,
+        vars_vec: *const *const c_char,
+        vars_values: *const *const c_char,
+        vars_vec_size: usize,
+        set_only_non_debug_params: c_int,
     ) -> c_int;
     fn TessBaseAPISetImage(
         handle: *mut c_void,
