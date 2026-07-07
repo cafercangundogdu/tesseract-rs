@@ -8,6 +8,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation for CI
 
 permissions:
   contents: read
@@ -24,17 +25,11 @@ jobs:
       with:
         components: rustfmt, clippy
     
-    - name: Cache cargo dependencies
-      uses: actions/cache@v3
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          ~/.cargo/bin
-          target
-        key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-lint-
+        prefix-key: "v1-rust"
+        key: "lint"
     
     - name: Check formatting
       run: cargo fmt -- --check
@@ -47,7 +42,7 @@ jobs:
     - name: Install cargo-audit
       run: |
         if ! command -v cargo-audit &> /dev/null; then
-          cargo install cargo-audit
+          cargo install cargo-audit --locked
         fi
       env:
         RUSTC_WRAPPER: ""
@@ -89,28 +84,22 @@ jobs:
     # - name: Install sccache
     #   run: cargo install sccache
     
-    - name: Cache cargo dependencies
-      uses: actions/cache@v3
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        prefix-key: "v1-rust"
+        key: "build-${{ matrix.os }}"
     
     - name: Cache build artifacts
       uses: actions/cache@v3
       with:
         path: |
-          ~/Library/Application Support/tesseract-rs
-          ~/.tesseract-rs
-          ~/AppData/Roaming/tesseract-rs
-          C:\Users\runneradmin\AppData\Roaming\tesseract-rs
-        key: ${{ runner.os }}-tesseract-build-${{ hashFiles('build.rs') }}
+          ${{ runner.os == 'Windows' && 'C:\Users\runneradmin\AppData\Roaming\tesseract-rs' || '' }}
+          ${{ runner.os == 'macOS' && '~/Library/Application Support/tesseract-rs' || '' }}
+          ${{ runner.os == 'Linux' && '~/.tesseract-rs' || '' }}
+        key: ${{ runner.os }}-tesseract-artifacts-${{ hashFiles('build.rs', 'Cargo.toml') }}
         restore-keys: |
-          ${{ runner.os }}-tesseract-build-
+          ${{ runner.os }}-tesseract-artifacts-
     
     - name: Setup MSVC environment (Windows)
       if: matrix.os == 'windows-latest'
@@ -127,32 +116,13 @@ jobs:
           echo "Renamed Git's link.exe to link_git.exe"
         }
       
-    - name: Build (Unix)
-      if: matrix.os != 'windows-latest'
+    - name: Build
       run: cargo build --verbose
-      shell: bash
-      env:
-        RUSTC_WRAPPER: ""
-    
-    - name: Build (Windows)
-      if: matrix.os == 'windows-latest'
-      run: cargo build --verbose
-      shell: pwsh
       env:
         RUSTC_WRAPPER: ""
       
-    - name: Run tests (Unix)
-      if: matrix.os != 'windows-latest'
+    - name: Run tests
       run: cargo test --verbose
-      shell: bash
-      env:
-        RUST_LOG: debug
-        RUSTC_WRAPPER: ""
-    
-    - name: Run tests (Windows)
-      if: matrix.os == 'windows-latest'
-      run: cargo test --verbose
-      shell: pwsh
       env:
         RUST_LOG: debug
         RUSTC_WRAPPER: ""
@@ -165,26 +135,20 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
     
-    - name: Cache cargo dependencies
-      uses: actions/cache@v3
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          ~/.cargo/bin
-          target
-        key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-coverage-
+        prefix-key: "v1-rust"
+        key: "coverage"
     
     - name: Cache build artifacts
       uses: actions/cache@v3
       with:
         path: |
           ~/.tesseract-rs
-        key: ${{ runner.os }}-tesseract-coverage-${{ hashFiles('build.rs') }}
+        key: ${{ runner.os }}-tesseract-artifacts-coverage-${{ hashFiles('build.rs', 'Cargo.toml') }}
         restore-keys: |
-          ${{ runner.os }}-tesseract-coverage-
+          ${{ runner.os }}-tesseract-artifacts-coverage-
     
     - name: Install dependencies
       run: |
@@ -194,7 +158,7 @@ jobs:
     - name: Install tarpaulin
       run: |
         if ! command -v cargo-tarpaulin &> /dev/null; then
-          cargo install cargo-tarpaulin
+          cargo install cargo-tarpaulin --locked
         fi
     
     - name: Generate coverage report
