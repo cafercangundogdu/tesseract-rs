@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-08
+
+### BREAKING CHANGES
+- Raised the minimum supported Rust version (MSRV) to **1.88** (required by the
+  upgraded dependencies).
+- `get_int_variable()`, `get_bool_variable()` and `get_double_variable()` now
+  return the actual variable value and `Err(GetVariableError)` when the
+  variable is not found, instead of the C `BOOL` success flag.
+
+### Added
+- FreeBSD support — the build and full test suite now run on FreeBSD in CI
+  (via a FreeBSD VM).
+- `embed-tessdata` feature: embed `.traineddata` directly into the compiled
+  binary and load it at runtime with `init_embedded()` / `embedded_languages()`.
+
+### Changed
+- Upgraded the bundled Tesseract **5.3.4 → 5.5.2** and Leptonica
+  **1.84.1 → 1.87.0**, now compiled with C++17.
+- Upgraded all dependencies to their latest versions (thiserror 2, reqwest
+  0.13, zip 7 deflate-only, imageproc 0.27, etc.).
+
+### Fixed
+- Fixed a SIGSEGV caused by truncated `TessBaseAPIInit4` / `TessBaseAPIInit5`
+  FFI signatures (missing trailing parameters).
+- Fixed the `TessBaseAPIGet{Int,Bool,Double}Variable` FFI signatures (missing
+  output pointer), which returned wrong values and could corrupt memory.
+- Fixed the Windows debug build failing to locate the `d`-suffixed static
+  libraries (#17).
+
+### Contributors
+- FreeBSD support and the `embed-tessdata` feature were contributed by
+  [@mwstowe](https://github.com/mwstowe) (#20).
+- The deflate-only `zip` configuration was contributed by
+  [@YageGeng](https://github.com/YageGeng) (#25).
+- The Windows debug-library and C++17 build fixes were cross-checked against
+  the maintained [xberg-tesseract](https://github.com/xberg-io/xberg) fork.
+
 ## [0.2.0] - 2026-03-23
 
 ### BREAKING CHANGES
