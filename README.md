@@ -18,14 +18,14 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.1.22", features = ["build-tesseract"] }
+tesseract-rs = { version = "0.3.0", features = ["build-tesseract"] }
 ```
 
 For single-binary deployment with embedded tessdata:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.1.22", features = ["embed-tessdata"] }
+tesseract-rs = { version = "0.3.0", features = ["embed-tessdata"] }
 ```
 
 By default, both English and Turkish tessdata are embedded. To embed only specific languages, set the `TESSERACT_EMBED_LANGUAGES` environment variable during build:
@@ -42,8 +42,8 @@ For development and testing, you'll also need these dependencies:
 
 ```toml
 [dev-dependencies]
-image = "0.25.5"
-imageproc = "0.25.0"
+image = "0.25.10"
+imageproc = "0.27.0"
 ```
 
 ## System Requirements
@@ -53,7 +53,7 @@ To build this crate, you need:
 - A C++ compiler (e.g., gcc, clang)
 - CMake
 - Internet connection (for downloading Tesseract training data)
-- Rust 1.83.0 or later
+- Rust 1.88 or later
 
 ## Environment Variables
 
@@ -95,8 +95,8 @@ The project includes several integration tests that verify OCR functionality. To
 
    ```toml
    [dev-dependencies]
-   image = "0.25.5"
-   imageproc = "0.25.0"
+   image = "0.25.10"
+   imageproc = "0.27.0"
    ```
 
 2. Run the tests:
@@ -183,7 +183,7 @@ fn get_tessdata_dir() -> PathBuf {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let api = TesseractAPI::new()?;
+    let api = TesseractAPI::new();
 
     // Get tessdata directory (uses default location or TESSDATA_PREFIX if set)
     let tessdata_dir = get_tessdata_dir();
@@ -259,7 +259,7 @@ use tesseract_rs::TesseractAPI;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let api = TesseractAPI::new()?;
+    let api = TesseractAPI::new();
     
     // Initialize with embedded tessdata - no external files needed!
     api.init_embedded("eng")?;
@@ -330,7 +330,7 @@ use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let tessdata_dir = get_tessdata_dir();
-    let api = TesseractAPI::new()?;
+    let api = TesseractAPI::new();
 
     // Initialize the main API
     api.init(tessdata_dir.to_str().unwrap(), "eng")?;
@@ -345,7 +345,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Spawn multiple threads for parallel OCR processing
     for _ in 0..3 {
-        let api_clone = api.clone(); // Clones the API with all configurations
+        let api_clone = api.try_clone()?; // Clone the API with all configurations
         let image_data = Arc::clone(&image_data);
 
         let handle = thread::spawn(move || {
@@ -409,7 +409,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contributors
 
-- [Cafer Can Gündoğdu](https://github.com/cafercangundogdu)
+- [Cafer Can Gündoğdu](https://github.com/cafercangundogdu) — author and maintainer
+- [Michael Stowe](https://github.com/mwstowe) — FreeBSD support and embedded tessdata
+- [Yage](https://github.com/YageGeng) — deflate-only `zip` configuration
+- [York Xiang](https://github.com/bombless) — Windows `$HOME` handling
 
 ## Contributing
 
@@ -431,7 +434,3 @@ Our commit messages follow the [Conventional Commits](https://www.conventionalco
 ## Acknowledgements
 
 This project uses [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) and [Leptonica](http://leptonica.org/). We are grateful to the maintainers and contributors of these projects.
-
-```
-
-```
