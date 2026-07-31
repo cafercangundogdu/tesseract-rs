@@ -1,4 +1,11 @@
 #![allow(clippy::uninlined_format_args)]
+// When both `build-tesseract` and `use-system-tesseract` are enabled, the
+// bundled-build module is compiled (it hosts shared helpers) but its build
+// entry point is not called — silence the resulting dead-code warnings.
+#![cfg_attr(
+    all(feature = "build-tesseract", feature = "use-system-tesseract"),
+    allow(dead_code)
+)]
 
 #[cfg(feature = "build-tesseract")]
 mod build_tesseract {
@@ -470,7 +477,7 @@ mod build_tesseract {
         extract_dir
     }
 
-    fn download_tessdata(project_dir: &Path) {
+    pub(crate) fn download_tessdata(project_dir: &Path) {
         let tessdata_dir = project_dir.join("tessdata");
         fs::create_dir_all(&tessdata_dir).expect("Failed to create Tessdata directory");
 
@@ -633,12 +640,56 @@ mod build_tesseract {
     }
 }
 
+#[cfg(feature = "use-system-tesseract")]
+mod system_tesseract {
+    use std::env;
+
+    /// Link against a system-installed Tesseract (Homebrew, libtesseract-dev,
+    /// etc.) instead of compiling the bundled sources.
+    ///
+    /// Uses pkg-config to locate `tesseract.pc`; leptonica is pulled in
+    /// transitively via the `Requires:` entry. libtesseract is C++, so the
+    /// C++ standard library runtime is linked explicitly.
+    pub fn link_system_tesseract() {
+        pkg_config::Config::new()
+            .probe("tesseract")
+            .expect("use-system-tesseract requires the Tesseract development library (e.g. `brew install tesseract` or `apt install libtesseract-dev`)");
+
+        if cfg!(target_os = "macos") {
+            println!("cargo:rustc-link-lib=c++");
+        } else if cfg!(target_os = "freebsd") {
+            println!("cargo:rustc-link-lib=c++");
+            println!("cargo:rustc-link-lib=pthread");
+        } else if cfg!(target_os = "linux") {
+            let uses_clang = env::var("CC")
+                .map(|cc| cc.contains("clang"))
+                .unwrap_or(false);
+            if uses_clang || cfg!(target_env = "musl") {
+                println!("cargo:rustc-link-lib=c++");
+            } else {
+                println!("cargo:rustc-link-lib=stdc++");
+            }
+            println!("cargo:rustc-link-lib=pthread");
+        }
+    }
+}
+
 fn main() {
-    #[cfg(feature = "build-tesseract")]
+    #[cfg(feature = "use-system-tesseract")]
+    system_tesseract::link_system_tesseract();
+
+    #[cfg(all(feature = "build-tesseract", not(feature = "use-system-tesseract")))]
     build_tesseract::build();
 
     #[cfg(feature = "embed-tessdata")]
-    generate_embedded_tessdata();
+    {
+        // In system mode the bundled build (which normally downloads the
+        // tessdata files) is skipped, so fetch them here for embedding.
+        #[cfg(feature = "use-system-tesseract")]
+        build_tesseract::download_tessdata(&build_tesseract::get_custom_out_dir());
+
+        generate_embedded_tessdata();
+    }
 }
 
 #[cfg(feature = "embed-tessdata")]
