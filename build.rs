@@ -303,6 +303,21 @@ mod build_tesseract {
         if cfg!(target_os = "macos") {
             cmake_cxx_flags.push_str("-stdlib=libc++ ");
             cmake_cxx_flags.push_str("-std=c++17 ");
+            // Pin the deployment target to 10.15, the minimum macOS version
+            // that provides std::filesystem (used by Tesseract 5.x
+            // baseapi.cpp). Because CMAKE_CXX_FLAGS is set explicitly below,
+            // the cmake crate skips injecting the cc crate's
+            // -mmacosx-version-min into the C++ flags (it only does so for
+            // C/ASM). Without an explicit deployment target, Xcode 26+
+            // runners derive a default below 10.15 and the build fails
+            // (issue #32). CMAKE_OSX_DEPLOYMENT_TARGET is the authoritative
+            // cmake-level setting; the flag in CMAKE_CXX_FLAGS is redundant
+            // but keeps the two consistent.
+            cmake_cxx_flags.push_str("-mmacosx-version-min=10.15 ");
+            additional_defines.push((
+                "CMAKE_OSX_DEPLOYMENT_TARGET".to_string(),
+                "10.15".to_string(),
+            ));
         } else if cfg!(target_os = "linux") {
             cmake_cxx_flags.push_str("-std=c++17 ");
             // Check if we're on a system using clang
