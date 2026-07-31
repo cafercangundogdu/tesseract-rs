@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-31
+
+### Fixed
+- Fixed the macOS build failing on Xcode 26+ runners: `std::filesystem` was
+  reported unavailable (introduced in macOS 10.15) because no deployment
+  target was set and the runner's default dropped below 10.15. The build now
+  pins `CMAKE_OSX_DEPLOYMENT_TARGET` / `-mmacosx-version-min` to 10.15 (#32).
+
+### Contributors
+- Reported by [@pndaza](https://github.com/pndaza) (#32).
+
 ## [0.3.0] - 2026-07-08
 
 ### BREAKING CHANGES
