@@ -18,14 +18,14 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.3.1", features = ["build-tesseract"] }
+tesseract-rs = { version = "0.4.0", features = ["build-tesseract"] }
 ```
 
 For single-binary deployment with embedded tessdata:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.3.1", features = ["embed-tessdata"] }
+tesseract-rs = { version = "0.4.0", features = ["embed-tessdata"] }
 ```
 
 By default, both English and Turkish tessdata are embedded. To embed only specific languages, set the `TESSERACT_EMBED_LANGUAGES` environment variable during build:
@@ -36,6 +36,40 @@ TESSERACT_EMBED_LANGUAGES=eng cargo build --features embed-tessdata
 
 # Embed multiple languages
 TESSERACT_EMBED_LANGUAGES=eng,fra,deu cargo build --features embed-tessdata
+```
+
+## Using a system-installed Tesseract
+
+Instead of compiling the bundled Tesseract/Leptonica sources (minutes), you
+can link against a system-installed Tesseract with the `use-system-tesseract`
+feature. The build then locates `tesseract.pc` via pkg-config:
+
+```toml
+[dependencies]
+tesseract-rs = { version = "0.4.0", default-features = false, features = ["use-system-tesseract"] }
+```
+
+```bash
+# macOS
+brew install tesseract
+
+# Debian/Ubuntu
+sudo apt install libtesseract-dev libleptonica-dev
+```
+
+`TESSDATA_PREFIX` or a tessdata directory passed to `init()` is still used to
+locate language data.
+
+## Command-line tool
+
+The workspace also ships `tesseract-rs-cli`, a small OCR command-line tool:
+
+```sh
+cargo install tesseract-rs-cli            # bundled Tesseract
+cargo install tesseract-rs-cli --no-default-features --features use-system-tesseract   # system Tesseract
+
+tesseract-rs image.png
+tesseract-rs -l eng+tur --psm 6 -o hocr scanned.png
 ```
 
 For development and testing, you'll also need these dependencies:
