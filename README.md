@@ -18,14 +18,14 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.3.0", features = ["build-tesseract"] }
+tesseract-rs = { version = "0.3.1", features = ["build-tesseract"] }
 ```
 
 For single-binary deployment with embedded tessdata:
 
 ```toml
 [dependencies]
-tesseract-rs = { version = "0.3.0", features = ["embed-tessdata"] }
+tesseract-rs = { version = "0.3.1", features = ["embed-tessdata"] }
 ```
 
 By default, both English and Turkish tessdata are embedded. To embed only specific languages, set the `TESSERACT_EMBED_LANGUAGES` environment variable during build:
