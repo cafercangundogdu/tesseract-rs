@@ -1,0 +1,26 @@
+[package]
+name = "tesseract-rs-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Cafer Can Gündoğdu <cafercangundogdu@gmail.com>"]
+description = "Command-line OCR tool built on tesseract-rs"
+license = "MIT"
+repository = "https://github.com/cafercangundogdu/tesseract-rs"
+readme = "README.md"
+keywords = ["tesseract", "ocr", "cli", "command-line"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+tesseract-rs = { version = "0.4.0", path = "..", default-features = false }
+image = "0.25.10"
+
+[features]
+default = ["bundled"]
+# Compile the bundled Tesseract/Leptonica sources (requires internet + cmake).
+bundled = ["tesseract-rs/build-tesseract"]
+# Link against a system-installed Tesseract (e.g. `brew install tesseract`).
+use-system-tesseract = ["tesseract-rs/use-system-tesseract"]
+
+[[bin]]
+name = "tesseract-rs"
+path = "src/main.rs"

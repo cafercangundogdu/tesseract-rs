@@ -1,6 +1,6 @@
 [package]
 name = "tesseract-rs"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 authors = ["Cafer Can Gündoğdu <cafercangundogdu@gmail.com>"]
 description = "Rust bindings for Tesseract OCR with optional built-in compilation"
@@ -19,7 +19,7 @@ categories = ["external-ffi-bindings", "computer-vision", "text-processing"]
 build = "build.rs"
 links = "tesseract"
 rust-version = "1.88"
-exclude = ["tessdata/*", "third_party/*"]
+exclude = ["tessdata/*", "third_party/*", "cli/*"]
 
 [dependencies]
 libc = "0.2.186"
@@ -38,12 +38,21 @@ reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
 zip = { version = "8.6.0", default-features = false, features = [
     "deflate",
 ], optional = true }
+pkg-config = { version = "0.3.33", optional = true }
 
 
 [features]
 default = ["build-tesseract"]
 build-tesseract = ["cc", "glob", "cmake", "reqwest", "zip"]
+# Link against a system-installed Tesseract (e.g. `brew install tesseract`)
+# instead of compiling the bundled sources. Implies `build-tesseract` so the
+# FFI layer (which is gated on it) is always compiled.
+use-system-tesseract = ["pkg-config", "build-tesseract"]
 embed-tessdata = ["build-tesseract"]
+
+[workspace]
+members = ["cli"]
+default-members = ["."]
 
 [package.metadata.docs.rs]
 features = ["docs-only"]

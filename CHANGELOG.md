@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-31
+
+### Added
+- `use-system-tesseract` feature: link against a system-installed Tesseract
+  (Homebrew, `libtesseract-dev`, ...) via pkg-config instead of compiling the
+  bundled sources — builds go from minutes to seconds.
+- `tesseract-rs-cli` — a new command-line OCR tool (`tesseract-rs <image>`),
+  shipped as a workspace crate. Install via `cargo install tesseract-rs-cli`
+  (bundled Tesseract) or `cargo install tesseract-rs-cli --no-default-features
+  --features use-system-tesseract` (system Tesseract).
+
+### Fixed
+- `process_pages()` crashed with SIGSEGV on tesseract 5.5.3: the FFI
+  signature of `TessBaseAPIProcessPages` declared a `char *` return type,
+  but the C API returns `BOOL`. On success the value `1` was treated as a
+  pointer and dereferenced. The signature now returns `c_int` and the text
+  is fetched via `GetUTF8Text`.
+
 ## [0.3.1] - 2026-07-31
 
 ### Fixed

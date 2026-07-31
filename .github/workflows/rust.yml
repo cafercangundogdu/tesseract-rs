@@ -35,7 +35,9 @@ jobs:
       run: cargo fmt -- --check
     
     - name: Run clippy
-      run: cargo clippy -- -D warnings
+      run: |
+        cargo clippy -- -D warnings
+        cargo clippy -p tesseract-rs-cli -- -D warnings
       env:
         RUSTC_WRAPPER: ""
     
@@ -117,7 +119,9 @@ jobs:
         }
       
     - name: Build
-      run: cargo build --verbose
+      run: |
+        cargo build --verbose
+        cargo build -p tesseract-rs-cli --verbose
       env:
         RUSTC_WRAPPER: ""
       
