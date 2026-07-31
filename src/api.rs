@@ -865,14 +865,13 @@ impl TesseractAPI {
                 std::ptr::null_mut(), // renderer
             )
         };
-        if result.is_null() {
-            Err(TesseractError::ProcessPagesError)
-        } else {
-            let c_str = unsafe { CStr::from_ptr(result) };
-            let output = c_str.to_str()?.to_owned();
-            unsafe { TessDeleteText(result) };
-            Ok(output)
+        // TessBaseAPIProcessPages returns BOOL (0 = failure); the recognized
+        // text is fetched separately via GetUTF8Text.
+        if result == 0 {
+            return Err(TesseractError::ProcessPagesError);
         }
+        drop(handle);
+        self.get_utf8_text()
     }
 
     /// Gets the initial languages as a string.
@@ -1613,7 +1612,7 @@ extern "C" {
         retry_config: *const c_char,
         timeout_millisec: c_int,
         renderer: *mut c_void,
-    ) -> *mut c_char;
+    ) -> c_int;
 
     fn TessBaseAPIGetInputName(handle: *mut c_void) -> *const c_char;
     fn TessBaseAPISetInputName(handle: *mut c_void, name: *const c_char);
