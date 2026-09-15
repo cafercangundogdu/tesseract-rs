@@ -62,6 +62,11 @@ mod build_tesseract {
         // legs) makes the second leg reuse the first leg's now-wrong-arch
         // compiled Tesseract/Leptonica static libs.
         let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".to_string());
+        // Expose the same target triple to test binaries at compile time (TARGET
+        // is only visible to build scripts, not to `cargo test`'s runtime env),
+        // so tests/common/mod.rs's get_default_tessdata_dir() can mirror this
+        // namespacing instead of silently drifting from it.
+        println!("cargo:rustc-env=TESSERACT_RS_TARGET={}", target);
         base.join(target)
     }
 

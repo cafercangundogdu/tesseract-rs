@@ -8,30 +8,30 @@ use std::path::PathBuf;
 use tesseract_rs::TesseractAPI;
 
 pub fn get_default_tessdata_dir() -> PathBuf {
-    if cfg!(target_os = "macos") {
+    // Must mirror build.rs's get_custom_out_dir() exactly, including the
+    // target-triple namespacing — TESSERACT_RS_TARGET is emitted by that
+    // same function via cargo:rustc-env so this can't silently drift out of
+    // sync with it again.
+    let target = env!("TESSERACT_RS_TARGET");
+    let base = if cfg!(target_os = "macos") {
         let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
         PathBuf::from(home_dir)
             .join("Library")
             .join("Application Support")
             .join("tesseract-rs")
-            .join("tessdata")
     } else if cfg!(target_os = "linux") {
         let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
-        PathBuf::from(home_dir)
-            .join(".tesseract-rs")
-            .join("tessdata")
+        PathBuf::from(home_dir).join(".tesseract-rs")
     } else if cfg!(target_os = "freebsd") {
         let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
-        PathBuf::from(home_dir)
-            .join(".tesseract-rs")
-            .join("tessdata")
+        PathBuf::from(home_dir).join(".tesseract-rs")
     } else if cfg!(target_os = "windows") {
         PathBuf::from(std::env::var("APPDATA").expect("APPDATA environment variable not set"))
             .join("tesseract-rs")
-            .join("tessdata")
     } else {
         panic!("Unsupported operating system");
-    }
+    };
+    base.join(target).join("tessdata")
 }
 
 pub fn get_tessdata_dir() -> PathBuf {
