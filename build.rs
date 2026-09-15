@@ -23,7 +23,7 @@ mod build_tesseract {
         "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.2.zip";
 
     pub fn get_custom_out_dir() -> PathBuf {
-        if cfg!(target_os = "macos") {
+        let base = if cfg!(target_os = "macos") {
             let home_dir = env::var("HOME").unwrap_or_else(|_| {
                 env::var("USER")
                     .map(|user| format!("/Users/{}", user))
@@ -55,7 +55,14 @@ mod build_tesseract {
                 .join("tesseract-rs")
         } else {
             panic!("Unsupported operating system");
-        }
+        };
+        // Namespace the cache by target triple: without this, building two
+        // different targets back-to-back on the same machine (e.g. a macOS
+        // universal build's aarch64-apple-darwin then x86_64-apple-darwin
+        // legs) makes the second leg reuse the first leg's now-wrong-arch
+        // compiled Tesseract/Leptonica static libs.
+        let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".to_string());
+        base.join(target)
     }
 
     pub fn build() {
