@@ -301,11 +301,7 @@ mod build_tesseract {
         } else if cfg!(target_os = "linux") {
             cmake_cxx_flags.push_str("-std=c++17 ");
             // Check if we're on a system using clang
-            if cfg!(target_env = "musl")
-                || env::var("CC")
-                    .map(|cc| cc.contains("clang"))
-                    .unwrap_or(false)
-            {
+            if linux_uses_clang() {
                 cmake_cxx_flags.push_str("-stdlib=libc++ ");
                 additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "clang++".to_string()));
             } else {
@@ -365,6 +361,13 @@ mod build_tesseract {
         (cmake_cxx_flags, additional_defines)
     }
 
+    fn linux_uses_clang() -> bool {
+        cfg!(target_env = "musl")
+            || env::var("CC")
+                .map(|cc| cc.contains("clang"))
+                .unwrap_or(false)
+    }
+
     fn emit_link_directives(leptonica_install_dir: &Path, tesseract_install_dir: &Path) {
         println!(
             "cargo:rustc-link-search=native={}",
@@ -380,11 +383,7 @@ mod build_tesseract {
         if cfg!(target_os = "macos") {
             println!("cargo:rustc-link-lib=c++");
         } else if cfg!(target_os = "linux") {
-            if cfg!(target_env = "musl")
-                || env::var("CC")
-                    .map(|cc| cc.contains("clang"))
-                    .unwrap_or(false)
-            {
+            if linux_uses_clang() {
                 println!("cargo:rustc-link-lib=c++");
             } else {
                 println!("cargo:rustc-link-lib=stdc++");
