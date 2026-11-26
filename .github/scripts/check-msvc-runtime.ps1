@@ -18,7 +18,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $dirSuffix = if ($Expect -eq 'static') { '-crt-static' } else { '' }
-$buildRoot = Join-Path $env:APPDATA 'tesseract-rs\build'
+$buildRoot = Join-Path $env:APPDATA 'tesseract-rs\build2'
 $targetDirs = @(Get-ChildItem $buildRoot -Directory |
     ForEach-Object { Get-ChildItem $_.FullName -Directory } |
     Where-Object { $_.Name -like "*-windows-msvc$dirSuffix" })
