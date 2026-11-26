@@ -38,7 +38,7 @@ TESSERACT_EMBED_LANGUAGES=eng cargo build --features embed-tessdata
 TESSERACT_EMBED_LANGUAGES=eng,fra,deu cargo build --features embed-tessdata
 ```
 
-Any language code from [tessdata_best](https://github.com/tesseract-ocr/tessdata_best) can be listed. Files that are not in the tessdata directory yet are downloaded during the build, and the build fails if a listed language cannot be found. To embed your own model, place `<name>.traineddata` in the tessdata directory and list `<name>`.
+Any language from the top level of [tessdata_best](https://github.com/tesseract-ocr/tessdata_best) (`deu`, `chi_sim`, ...) can be listed. Files that are not in the tessdata directory yet are downloaded during the build, and the build fails if a listed language cannot be found. To embed your own model, place `<name>.traineddata` in the tessdata directory and list `<name>`.
 
 ## Using a system-installed Tesseract
 
@@ -119,7 +119,7 @@ The crate uses the following directory structure based on your operating system:
 The cache includes:
 
 - Compiled Tesseract and Leptonica libraries
-- Downloaded training data in the `tessdata` subdirectory: eng.traineddata and tur.traineddata, plus any language listed in `TESSERACT_EMBED_LANGUAGES`
+- Downloaded training data in the `tessdata` subdirectory: eng.traineddata and tur.traineddata for bundled builds, plus any language listed in `TESSERACT_EMBED_LANGUAGES` when `embed-tessdata` is enabled
 - Third-party source code
 
 The training data files are automatically downloaded and placed in the appropriate `tessdata` subdirectory during the build process. You don't need to manually set up the tessdata directory unless you want to use a custom location.

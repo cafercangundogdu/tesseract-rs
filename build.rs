@@ -527,17 +527,29 @@ mod build_tesseract {
                 );
             }
 
-            // Write to a temporary name and rename once complete, so an
-            // interrupted download never leaves a truncated file that later
-            // builds would treat as already present.
-            let partial_path = tessdata_dir.join(format!("{}.part", filename));
+            // Download under a temporary name and rename once complete, so an
+            // interrupted build never leaves a truncated file that later
+            // builds would treat as already present. The name is unique per
+            // process because the directory is shared: another build (a
+            // second project, rust-analyzer) may be fetching the same file.
+            let partial_path =
+                tessdata_dir.join(format!("{}.{}.part", filename, std::process::id()));
             let mut dest = fs::File::create(&partial_path).expect("Failed to create file");
-            response
-                .copy_to(&mut dest)
-                .unwrap_or_else(|e| panic!("Failed to write {}: {}", filename, e));
+            if let Err(e) = response.copy_to(&mut dest) {
+                drop(dest);
+                let _ = fs::remove_file(&partial_path);
+                panic!("Failed to write {}: {}", filename, e);
+            }
             drop(dest);
-            fs::rename(&partial_path, &file_path)
-                .unwrap_or_else(|e| panic!("Failed to move {} into place: {}", filename, e));
+
+            if let Err(e) = fs::rename(&partial_path, &file_path) {
+                let _ = fs::remove_file(&partial_path);
+                // Losing the race to a concurrent build is fine as long as
+                // the file is there now.
+                if !file_path.exists() {
+                    panic!("Failed to move {} into place: {}", filename, e);
+                }
+            }
             println!("cargo:warning={} downloaded", filename);
         }
     }
@@ -737,10 +749,10 @@ fn embed_languages() -> Vec<String> {
             continue;
         }
         // The code ends up in a file name, a download URL and a generated
-        // string literal, so keep it to what traineddata names actually use.
+        // string literal, so rule out path separators, quotes and the like.
         if !lang
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
         {
             panic!(
                 "Invalid language code {:?} in TESSERACT_EMBED_LANGUAGES \
