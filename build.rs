@@ -446,14 +446,20 @@ mod build_tesseract {
         // Extract files, ignoring the top-level directory
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).unwrap();
-            let file_path = file.mangled_name();
-            let file_path = file_path.to_str().unwrap();
+            // enclosed_name() returns None for absolute paths and for entries
+            // that would resolve outside the extraction directory.
+            let file_path = file.enclosed_name().unwrap_or_else(|| {
+                panic!(
+                    "Refusing to extract unsafe path {:?} from the {} archive",
+                    file.name(),
+                    name
+                )
+            });
 
             // Skip the top-level directory
-            let path = Path::new(file_path);
-            let path = path
-                .strip_prefix(path.components().next().unwrap())
-                .unwrap();
+            let mut components = file_path.components();
+            components.next();
+            let path = components.as_path();
 
             if path.as_os_str().is_empty() {
                 continue;
