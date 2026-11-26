@@ -393,6 +393,10 @@ mod build_tesseract {
 
         // Common flags and defines for all platforms
         cmake_cxx_flags.push_str("-DUSE_STD_NAMESPACE ");
+        // Leptonica and Tesseract install through GNUInstallDirs, which picks
+        // lib64 on Fedora, RHEL and similar distributions. Everything below
+        // looks for the libraries in <prefix>/lib, so pin the directory.
+        additional_defines.push(("CMAKE_INSTALL_LIBDIR".to_string(), "lib".to_string()));
         additional_defines.push((
             "CMAKE_POSITION_INDEPENDENT_CODE".to_string(),
             "ON".to_string(),

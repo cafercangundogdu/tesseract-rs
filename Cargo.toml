@@ -1,6 +1,6 @@
 [package]
 name = "tesseract-rs"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 authors = ["Cafer Can Gündoğdu <cafercangundogdu@gmail.com>"]
 description = "Rust bindings for Tesseract OCR with optional built-in compilation"
