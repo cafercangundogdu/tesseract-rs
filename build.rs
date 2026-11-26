@@ -654,15 +654,14 @@ mod build_tesseract {
                 // MSVC debug builds append a "d" suffix to the library name, so
                 // list both release and debug variants (see issue #17).
                 "leptonica" => vec![
-                    "leptonica.lib".to_string(),
                     "libleptonica.lib".to_string(),
                     "leptonica-static.lib".to_string(),
                     "leptonica-1.87.0.lib".to_string(),
                     "leptonica-1.87.0d.lib".to_string(),
                     "leptonicad.lib".to_string(),
+                    "leptonica.lib".to_string(),
                 ],
                 "tesseract" => vec![
-                    "tesseract.lib".to_string(),
                     "libtesseract.lib".to_string(),
                     "tesseract-static.lib".to_string(),
                     "tesseract55.lib".to_string(),
@@ -671,6 +670,7 @@ mod build_tesseract {
                     "tesseract55d.lib".to_string(),
                     "tesseract54d.lib".to_string(),
                     "tesseract53d.lib".to_string(),
+                    "tesseract.lib".to_string(),
                 ],
                 _ => vec![format!("{}.lib", name)],
             }
@@ -708,8 +708,9 @@ mod build_tesseract {
             }
 
             if let Some(lib_path) = found_lib_path {
-                // Copy to expected location for caching
-                if !out_path.exists() {
+                // Refresh a canonical copy left by an earlier build. Skip
+                // the copy when CMake already installed under that name.
+                if lib_path != out_path {
                     if let Err(e) = fs::copy(&lib_path, &out_path) {
                         println!(
                             "cargo:warning=Failed to copy library to standard location: {}",
