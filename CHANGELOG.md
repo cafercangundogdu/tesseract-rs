@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-11-26
+
+### Security
+- Raised the `zip` build-dependency to 9.x (minimum 9.0.5). `zip` 8.x is in the
+  affected range of several advisories, and GHSA-m665-v7pm-7grj is only fixed
+  in 9.0.5 (#39). zip 9.8 and later need Rust 1.89; on Rust 1.88 pin an older
+  9.x with `cargo update -p zip --precise 9.7.3`.
+
+### Fixed
+- `embed-tessdata` only ever downloaded `eng` and `tur`, so any other language
+  in `TESSERACT_EMBED_LANGUAGES` was left out of the binary with nothing more
+  than a build warning. Every listed language is now downloaded when it is
+  missing, and a language that cannot be found fails the build (#37).
+- Changing `TESSERACT_EMBED_LANGUAGES` now takes effect without a clean build.
+- Tessdata downloads check the HTTP status and are written atomically, so a
+  failed or interrupted download no longer leaves a broken `.traineddata`
+  behind.
+- On MSVC the bundled libraries now follow the `crt-static` target feature
+  (`/MT` or `/MD`) instead of always using the dynamic C runtime (#35).
+- The shared build cache was keyed on the library file name only, so libraries
+  built for another crate version, target or C runtime could be reused. Build
+  output now lives in `build/<crate version>/<target>/` inside the cache
+  directory (#35).
+- `CARGO_CLEAN=1` had no effect unless the build script happened to rerun for
+  another reason. It now reliably rebuilds the libraries for the current
+  target.
+
+### Changed
+- With the Visual Studio CMake generator the bundled libraries are always built
+  in the Release configuration, as on every other platform. Debug cargo
+  profiles previously built them unoptimized and against the debug C runtime.
+- The `cache/`, `leptonica/`, `tesseract/` and `third_party/` directories at the
+  top level of the cache directory are no longer used. They can be deleted
+  unless an older version of this crate is still built on the same machine.
+
+### Contributors
+- Reported by [@logan-markewich](https://github.com/logan-markewich) and
+  [@Phil-Fan](https://github.com/Phil-Fan) (#39),
+  [@w-charlton-virifides](https://github.com/w-charlton-virifides) (#37) and
+  [@Waquo](https://github.com/Waquo) (#35).
+
 ## [0.4.0] - 2026-07-31
 
 ### Added
