@@ -21,6 +21,11 @@ mod build_tesseract {
         "https://github.com/DanBloomberg/leptonica/archive/refs/tags/1.87.0.zip";
     const TESSERACT_URL: &str =
         "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.2.zip";
+    const TESSDATA_BASE_URL: &str = "https://github.com/tesseract-ocr/tessdata_best/raw/main/";
+
+    /// Languages every bundled build downloads into the shared tessdata
+    /// directory. Also the default set for the `embed-tessdata` feature.
+    pub(crate) const DEFAULT_LANGUAGES: &[&str] = &["eng", "tur"];
 
     pub fn get_custom_out_dir() -> PathBuf {
         if cfg!(target_os = "macos") {
@@ -300,7 +305,7 @@ mod build_tesseract {
         );
         println!("cargo:warning=Tessdata dir: {:?}", tessdata_prefix);
 
-        download_tessdata(&project_dir);
+        download_tessdata(&project_dir, DEFAULT_LANGUAGES);
     }
 
     fn get_os_specific_config() -> (String, Vec<(String, String)>) {
@@ -477,40 +482,63 @@ mod build_tesseract {
         extract_dir
     }
 
-    pub(crate) fn download_tessdata(project_dir: &Path) {
+    /// Fetch `<lang>.traineddata` from tessdata_best into the shared tessdata
+    /// directory for every language that is not already there.
+    pub(crate) fn download_tessdata<S: AsRef<str>>(project_dir: &Path, languages: &[S]) {
         let tessdata_dir = project_dir.join("tessdata");
         fs::create_dir_all(&tessdata_dir).expect("Failed to create Tessdata directory");
 
-        let languages = ["eng", "tur"];
-        let base_url = "https://github.com/tesseract-ocr/tessdata_best/raw/main/";
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(300))
+            .build()
+            .expect("Failed to create HTTP client");
 
-        for lang in &languages {
+        for lang in languages {
+            let lang = lang.as_ref();
             let filename = format!("{}.traineddata", lang);
             let file_path = tessdata_dir.join(&filename);
 
-            if !file_path.exists() {
-                let url = format!("{}{}", base_url, filename);
-                let response = client
-                    .get(&url)
-                    .send()
-                    .expect("Failed to download Tessdata");
-                let mut dest = fs::File::create(&file_path).expect("Failed to create file");
-                std::io::copy(
-                    &mut response
-                        .bytes()
-                        .expect("Failed to get response bytes")
-                        .as_ref(),
-                    &mut dest,
-                )
-                .expect("Failed to write Tessdata");
-                println!("cargo:warning={} downloaded", filename);
-            } else {
+            if file_path.exists() {
                 println!(
                     "cargo:warning={} already exists, skipping download",
                     filename
                 );
+                continue;
             }
+
+            let url = format!("{}{}", TESSDATA_BASE_URL, filename);
+            let mut response = client
+                .get(&url)
+                .send()
+                .unwrap_or_else(|e| panic!("Failed to download {}: {}", filename, e));
+
+            if response.status() == reqwest::StatusCode::NOT_FOUND {
+                panic!(
+                    "No traineddata found for language '{}' ({}). \
+                     See https://github.com/tesseract-ocr/tessdata_best for the available codes.",
+                    lang, url
+                );
+            }
+            if !response.status().is_success() {
+                panic!(
+                    "Failed to download {}: HTTP {}",
+                    filename,
+                    response.status()
+                );
+            }
+
+            // Write to a temporary name and rename once complete, so an
+            // interrupted download never leaves a truncated file that later
+            // builds would treat as already present.
+            let partial_path = tessdata_dir.join(format!("{}.part", filename));
+            let mut dest = fs::File::create(&partial_path).expect("Failed to create file");
+            response
+                .copy_to(&mut dest)
+                .unwrap_or_else(|e| panic!("Failed to write {}: {}", filename, e));
+            drop(dest);
+            fs::rename(&partial_path, &file_path)
+                .unwrap_or_else(|e| panic!("Failed to move {} into place: {}", filename, e));
+            println!("cargo:warning={} downloaded", filename);
         }
     }
 
@@ -683,17 +711,61 @@ fn main() {
 
     #[cfg(feature = "embed-tessdata")]
     {
-        // In system mode the bundled build (which normally downloads the
-        // tessdata files) is skipped, so fetch them here for embedding.
-        #[cfg(feature = "use-system-tesseract")]
-        build_tesseract::download_tessdata(&build_tesseract::get_custom_out_dir());
+        let languages = embed_languages();
 
-        generate_embedded_tessdata();
+        // The bundled build only fetches the default languages, and system
+        // mode fetches nothing, so make sure everything that was requested
+        // for embedding is present.
+        build_tesseract::download_tessdata(&build_tesseract::get_custom_out_dir(), &languages);
+
+        generate_embedded_tessdata(&languages);
     }
 }
 
+/// Languages to embed, taken from `TESSERACT_EMBED_LANGUAGES` (comma
+/// separated). Falls back to the default set when the variable is unset or
+/// empty.
 #[cfg(feature = "embed-tessdata")]
-fn generate_embedded_tessdata() {
+fn embed_languages() -> Vec<String> {
+    println!("cargo:rerun-if-env-changed=TESSERACT_EMBED_LANGUAGES");
+
+    let requested = std::env::var("TESSERACT_EMBED_LANGUAGES").unwrap_or_default();
+
+    let mut languages: Vec<String> = Vec::new();
+    for lang in requested.split(',').map(str::trim) {
+        if lang.is_empty() {
+            continue;
+        }
+        // The code ends up in a file name, a download URL and a generated
+        // string literal, so keep it to what traineddata names actually use.
+        if !lang
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            panic!(
+                "Invalid language code {:?} in TESSERACT_EMBED_LANGUAGES \
+                 (expected codes such as \"eng\" or \"chi_sim\")",
+                lang
+            );
+        }
+        if !languages.iter().any(|l| l == lang) {
+            languages.push(lang.to_string());
+        }
+    }
+
+    if languages.is_empty() {
+        languages.extend(
+            build_tesseract::DEFAULT_LANGUAGES
+                .iter()
+                .map(|l| l.to_string()),
+        );
+    }
+
+    languages
+}
+
+#[cfg(feature = "embed-tessdata")]
+fn generate_embedded_tessdata(languages: &[String]) {
     use std::fs;
     use std::path::Path;
 
@@ -710,31 +782,24 @@ fn generate_embedded_tessdata() {
     embedded_code.push_str("    pub fn new() -> Self {\n");
     embedded_code.push_str("        let mut data = HashMap::new();\n");
 
-    // Embed language files based on environment variables
-    let embed_languages =
-        std::env::var("TESSERACT_EMBED_LANGUAGES").unwrap_or_else(|_| "eng,tur".to_string());
-
-    let languages: Vec<&str> = embed_languages.split(',').map(|s| s.trim()).collect();
-
-    for lang in &languages {
+    for lang in languages {
         let traineddata_file = tessdata_dir.join(format!("{}.traineddata", lang));
-        if traineddata_file.exists() {
-            embedded_code.push_str(&format!(
-                "        data.insert(\"{}\", include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{}.traineddata\")) as &'static [u8]);\n",
-                lang, lang
-            ));
 
-            // Copy the file to OUT_DIR so include_bytes! can find it
-            let dest = Path::new(&out_dir).join(format!("{}.traineddata", lang));
-            if let Err(e) = fs::copy(&traineddata_file, &dest) {
-                println!("cargo:warning=Failed to copy {}.traineddata: {}", lang, e);
-            }
-        } else {
-            println!(
-                "cargo:warning=Language {} not found in tessdata directory",
-                lang
-            );
-        }
+        // Copy the file to OUT_DIR so include_bytes! can find it
+        let dest = Path::new(&out_dir).join(format!("{}.traineddata", lang));
+        fs::copy(&traineddata_file, &dest).unwrap_or_else(|e| {
+            panic!(
+                "Failed to copy {} to {}: {}",
+                traineddata_file.display(),
+                dest.display(),
+                e
+            )
+        });
+
+        embedded_code.push_str(&format!(
+            "        data.insert(\"{}\", include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{}.traineddata\")) as &'static [u8]);\n",
+            lang, lang
+        ));
     }
 
     embedded_code.push_str("        Self { data }\n");

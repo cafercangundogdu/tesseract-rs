@@ -24,6 +24,33 @@ mod embedded_tests {
         assert!(data.len() > 4, "Tessdata should be larger than 4 bytes");
     }
 
+    /// build.rs embeds every language listed in `TESSERACT_EMBED_LANGUAGES`
+    /// (eng and tur when it is unset), downloading the ones that are missing.
+    #[test]
+    fn test_requested_languages_are_embedded() {
+        let requested = option_env!("TESSERACT_EMBED_LANGUAGES")
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("eng,tur");
+        let embedded = embedded_languages();
+
+        for lang in requested
+            .split(',')
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+        {
+            assert!(
+                embedded.contains(&lang),
+                "{lang} was requested but is not embedded (embedded: {embedded:?})"
+            );
+
+            // Initialising proves the embedded bytes are real traineddata and
+            // not, say, a saved HTTP error page.
+            let api = TesseractAPI::new();
+            api.init_embedded(lang)
+                .unwrap_or_else(|e| panic!("Failed to initialize embedded {lang}: {e}"));
+        }
+    }
+
     #[test]
     fn test_get_nonexistent_language() {
         let data = get_embedded_tessdata("nonexistent");

@@ -130,6 +130,14 @@ jobs:
       env:
         RUST_LOG: debug
         RUSTC_WRAPPER: ""
+
+    - name: Run tests (embedded tessdata)
+      run: cargo test --features embed-tessdata --test embedded_test --verbose
+      env:
+        # heb is not one of the default languages, so this also covers the
+        # on-demand tessdata download.
+        TESSERACT_EMBED_LANGUAGES: eng,heb
+        RUSTC_WRAPPER: ""
     
   coverage:
     runs-on: ubuntu-latest
