@@ -122,6 +122,7 @@ mod build_tesseract {
             "leptonica",
             &leptonica_cache_dir,
             &leptonica_install_dir,
+            None,
             || {
                 let mut leptonica_config = Config::new(&leptonica_dir);
                 leptonica_config.out_dir(cargo_out_dir.join("leptonica"));
@@ -185,10 +186,20 @@ mod build_tesseract {
             cmake_cxx_flags
         );
 
-        build_or_use_cached(
+        let openmp_runtime_hint = expected_openmp_runtime();
+        #[allow(
+            clippy::manual_map,
+            reason = "Make the two OpenMP linking cases explicit"
+        )]
+        let cmake_cache = match openmp_runtime_hint {
+            Some(_) => Some(tesseract_build_dir.join("build").join("CMakeCache.txt")),
+            None => None,
+        };
+        let openmp_runtime_path = build_or_use_cached(
             "tesseract",
             &tesseract_cache_dir,
             &tesseract_install_dir,
+            cmake_cache.as_deref(),
             || {
                 let mut tesseract_config = Config::new(&tesseract_dir);
                 tesseract_config.out_dir(&tesseract_build_dir);
@@ -241,7 +252,14 @@ mod build_tesseract {
                     .define("GRAPHICS_DISABLED", "ON")
                     .define("DISABLED_LEGACY_ENGINE", "OFF")
                     .define("USE_OPENCL", "OFF")
-                    .define("OPENMP_BUILD", "OFF")
+                    .define(
+                        "OPENMP_BUILD",
+                        if cfg!(feature = "openmp") {
+                            "ON"
+                        } else {
+                            "OFF"
+                        },
+                    )
                     .define("BUILD_TESTS", "OFF")
                     .define("ENABLE_LTO", "OFF")
                     .define("BUILD_PROG", "OFF")
@@ -265,6 +283,9 @@ mod build_tesseract {
         println!("cargo:rerun-if-changed={}", tesseract_dir.display());
 
         emit_link_directives(&leptonica_install_dir, &tesseract_install_dir);
+        if let Some(expected_openmp_runtime) = openmp_runtime_hint {
+            emit_openmp_link_directives(openmp_runtime_path.as_deref(), expected_openmp_runtime);
+        }
 
         println!(
             "cargo:warning=Leptonica include dir: {:?}",
@@ -372,6 +393,58 @@ mod build_tesseract {
                 .unwrap_or(false)
     }
 
+    #[derive(Clone, Copy)]
+    enum OpenMpRuntime {
+        Llvm,
+        Gnu,
+    }
+
+    impl OpenMpRuntime {
+        fn link_name(self) -> RustcLinkName {
+            match self {
+                Self::Llvm => RustcLinkName::known("omp"),
+                Self::Gnu => RustcLinkName::known("gomp"),
+            }
+        }
+    }
+
+    struct RustcLinkName(String);
+
+    impl RustcLinkName {
+        fn known(name: &str) -> Self {
+            Self(name.to_string())
+        }
+
+        fn as_str(&self) -> &str {
+            &self.0
+        }
+    }
+
+    // Some means we emit explicit OpenMP link directives. Its runtime is
+    // the fallback if CMake does not provide a linkable library. None
+    // means we skip emitting explicit OpenMP link directives.
+    fn expected_openmp_runtime() -> Option<OpenMpRuntime> {
+        if !cfg!(feature = "openmp") {
+            None
+        } else if cfg!(any(target_os = "macos", target_os = "freebsd"))
+            || (cfg!(target_os = "linux") && linux_uses_clang())
+        {
+            Some(OpenMpRuntime::Llvm)
+        } else if cfg!(target_os = "linux") {
+            Some(OpenMpRuntime::Gnu)
+        } else if cfg!(target_os = "windows") {
+            // OpenMP linking is automatic on Windows. MSVC embeds the
+            // runtime linker directives in the archive.
+            None
+        } else {
+            println!(
+                "cargo:warning=OpenMP is enabled, but runtime linking is unknown on {}",
+                env::consts::OS
+            );
+            None
+        }
+    }
+
     fn emit_link_directives(leptonica_install_dir: &Path, tesseract_install_dir: &Path) {
         println!(
             "cargo:rustc-link-search=native={}",
@@ -411,6 +484,60 @@ mod build_tesseract {
             "cargo:rustc-link-search=native={}",
             env::var("OUT_DIR").unwrap()
         );
+    }
+
+    fn find_openmp_library_in_cmake_cache(cmake_cache: &Path) -> Option<PathBuf> {
+        let contents = fs::read_to_string(cmake_cache).ok()?;
+        let library_names = contents
+            .lines()
+            .find_map(|line| line.strip_prefix("OpenMP_CXX_LIB_NAMES:STRING="))?;
+
+        library_names
+            .split(';')
+            // OpenMP_CXX_LIB_NAMES may also contain dependencies such as pthread.
+            // Select the runtime-like entry: commonly gomp, libomp, or iomp5.
+            .filter(|name| name.contains("omp"))
+            .find_map(|name| {
+                let key = format!("OpenMP_{name}_LIBRARY:FILEPATH=");
+                contents.lines().find_map(|line| {
+                    line.strip_prefix(&key)
+                        .filter(|value| !value.ends_with("-NOTFOUND"))
+                        .map(PathBuf::from)
+                })
+            })
+    }
+
+    /// Converts a library filename into the name expected by `rustc-link-lib`
+    /// by removing an optional `lib` prefix and a recognized library suffix.
+    ///
+    /// For example, `libiomp5.so` becomes `iomp5`. CMake may select runtimes
+    /// other than the usual `omp` and `gomp`.
+    fn library_link_name(library_path: &Path) -> Option<RustcLinkName> {
+        let file_name = library_path.file_name()?.to_str()?;
+        let name = file_name.strip_prefix("lib").unwrap_or(file_name);
+        let suffix = [".so", ".dylib", ".a", ".lib"]
+            .iter()
+            .filter_map(|suffix| name.find(suffix))
+            .min()
+            .unwrap_or(name.len());
+        Some(RustcLinkName(name[..suffix].to_string()))
+    }
+
+    fn emit_openmp_link_directives(
+        library_path: Option<&Path>,
+        expected_openmp_runtime: OpenMpRuntime,
+    ) {
+        // Rust links the static Tesseract archive directly, so CMake's
+        // transitive OpenMP link dependency needs to be supplied explicitly.
+        if let Some(search_dir) = library_path.and_then(Path::parent) {
+            println!("cargo:rustc-link-search=native={}", search_dir.display());
+        }
+        // Prefer the runtime CMake found. If its library path is unavailable
+        // or unusable, fall back to the usual LLVM or GNU runtime name.
+        let runtime = library_path
+            .and_then(library_link_name)
+            .unwrap_or_else(|| expected_openmp_runtime.link_name());
+        println!("cargo:rustc-link-lib={}", runtime.as_str());
     }
 
     fn download_and_extract(target_dir: &Path, url: &str, name: &str) -> PathBuf {
@@ -582,6 +709,9 @@ mod build_tesseract {
         if msvc && crt_static() {
             name.push_str("-crt-static");
         }
+        if cfg!(feature = "openmp") {
+            name.push_str("-openmp");
+        }
         name
     }
 
@@ -594,10 +724,20 @@ mod build_tesseract {
         }
     }
 
-    fn build_or_use_cached<F>(name: &str, cache_dir: &Path, install_dir: &Path, build_fn: F)
+    // Returns the runtime library path when an OpenMP CMake cache is
+    // supplied and its resolved runtime library exists.
+    fn build_or_use_cached<F>(
+        name: &str,
+        cache_dir: &Path,
+        install_dir: &Path,
+        cmake_cache: Option<&Path>,
+        build_fn: F,
+    ) -> Option<PathBuf>
     where
         F: FnOnce(),
     {
+        let explicit_openmp_linking_needed = cmake_cache.is_some();
+
         // Expected library name for caching
         let lib_name = if cfg!(target_os = "windows") {
             format!("{}.lib", name)
@@ -641,7 +781,22 @@ mod build_tesseract {
         fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
         fs::create_dir_all(out_path.parent().unwrap()).expect("Failed to create output directory");
 
-        let restored = cached_path.exists()
+        // A hit skips CMake and may have no live CMakeCache.txt (for example
+        // with a fresh Cargo target directory). Keep a read-only snapshot beside
+        // the archive so we can recover its OpenMP runtime name and library path.
+        // Read only the OpenMP entries. The source/build paths and compiler and
+        // generator settings describe the original build tree; restoring this
+        // file as a live CMake cache could configure the wrong tree or fail.
+        let cmake_cache_snapshot = cache_dir.join("tesseract-cmake-cache.txt");
+        let cached_openmp_runtime_path = if explicit_openmp_linking_needed {
+            find_openmp_library_in_cmake_cache(&cmake_cache_snapshot).filter(|path| path.is_file())
+        } else {
+            None
+        };
+        let openmp_cache_ok =
+            !explicit_openmp_linking_needed || cached_openmp_runtime_path.is_some();
+        let restored = openmp_cache_ok
+            && cached_path.exists()
             && match fs::copy(&cached_path, &out_path) {
                 Ok(_) => {
                     println!("Using cached {} library", name);
@@ -682,10 +837,39 @@ mod build_tesseract {
                         );
                     }
                 }
-                // Cache the library
-                if let Err(e) = fs::copy(&lib_path, &cached_path) {
+                let openmp_runtime_path = cmake_cache
+                    .and_then(find_openmp_library_in_cmake_cache)
+                    .filter(|path| path.is_file());
+                let save_cache = || -> std::io::Result<()> {
+                    let Some(cmake_cache) = cmake_cache else {
+                        // Explicit OpenMP linking is unnecessary. Cache the
+                        // archive and skip the runtime snapshot handling.
+                        return fs::copy(&lib_path, &cached_path).map(|_| ());
+                    };
+                    // Invalidate any previous archive even if this build
+                    // falls back and cannot supply a replacement.
+                    match fs::remove_file(&cached_path) {
+                        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e),
+                        _ => {}
+                    }
+                    // For safety, skip caching builds that rely on a
+                    // fallback OpenMP runtime. A cache hit should use the
+                    // runtime that CMake selected.
+                    if openmp_runtime_path.is_none() {
+                        return Ok(());
+                    }
+                    // Publish the new archive only after both copies
+                    // succeed so an interrupted write cannot become a hit.
+                    fs::copy(cmake_cache, &cmake_cache_snapshot)?;
+                    let pending_archive =
+                        cached_path.with_extension(format!("{}.part", std::process::id()));
+                    fs::copy(&lib_path, &pending_archive)?;
+                    fs::rename(&pending_archive, &cached_path)
+                };
+                if let Err(e) = save_cache() {
                     println!("cargo:warning=Failed to cache library: {}", e);
                 }
+                return openmp_runtime_path;
             } else {
                 println!(
                     "cargo:warning=Library {} not found! Searched for: {:?}",
@@ -703,7 +887,9 @@ mod build_tesseract {
                     }
                 }
             }
+            return None;
         }
+        cached_openmp_runtime_path
     }
 }
 

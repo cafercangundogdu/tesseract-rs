@@ -21,6 +21,13 @@ Add this to your `Cargo.toml`:
 tesseract-rs = { version = "0.4.2", features = ["build-tesseract"] }
 ```
 
+Enable OpenMP support for the bundled Tesseract build with the `openmp` feature:
+
+```toml
+[dependencies]
+tesseract-rs = { version = "0.4.2", features = ["openmp"] }
+```
+
 For single-binary deployment with embedded tessdata:
 
 ```toml

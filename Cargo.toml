@@ -44,6 +44,8 @@ pkg-config = { version = "0.3.33", optional = true }
 [features]
 default = ["build-tesseract"]
 build-tesseract = ["cc", "glob", "cmake", "reqwest", "zip"]
+# Enable OpenMP support when compiling the bundled Tesseract sources.
+openmp = ["build-tesseract"]
 # Link against a system-installed Tesseract (e.g. `brew install tesseract`)
 # instead of compiling the bundled sources. Implies `build-tesseract` so the
 # FFI layer (which is gated on it) is always compiled.

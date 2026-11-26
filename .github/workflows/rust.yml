@@ -262,3 +262,36 @@ jobs:
       with:
         file: ./cobertura.xml
         fail_ci_if_error: false
+
+  clang-openmp:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install Clang build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential clang libc++-dev libc++abi-dev libomp-dev
+
+    - name: Build OpenMP example with Clang
+      run: |
+        cargo build --example embedded_example --features openmp,embed-tessdata --verbose
+
+        # Drop Cargo's copy of the CMake build tree while keeping the shared cache.
+        cargo clean -p tesseract-rs
+        cache_log="$RUNNER_TEMP/openmp-cache-hit.log"
+        if ! cargo build --example embedded_example --features openmp,embed-tessdata -vv >"$cache_log" 2>&1 ||
+           ! grep -F 'Using cached tesseract library' "$cache_log"; then
+          tail -n 100 "$cache_log"
+          exit 1
+        fi
+        test -z "$(find target/debug/build -path '*/out/tesseract/build/CMakeCache.txt' -print -quit)"
+        target/debug/examples/embedded_example
+      env:
+        CC: clang
+        CXX: clang++
+        RUSTC_WRAPPER: ""
