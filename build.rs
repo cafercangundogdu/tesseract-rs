@@ -681,14 +681,18 @@ mod build_tesseract {
         fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
         fs::create_dir_all(out_path.parent().unwrap()).expect("Failed to create output directory");
 
-        if cached_path.exists() {
-            println!("Using cached {} library", name);
-            if let Err(e) = fs::copy(&cached_path, &out_path) {
-                println!("cargo:warning=Failed to copy cached library: {}", e);
-                // If cache copy fails, rebuild
-                build_fn();
-            }
-        } else {
+        let restored = cached_path.exists()
+            && match fs::copy(&cached_path, &out_path) {
+                Ok(_) => {
+                    println!("Using cached {} library", name);
+                    true
+                }
+                Err(e) => {
+                    println!("cargo:warning=Failed to copy cached library: {}", e);
+                    false
+                }
+            };
+        if !restored {
             println!("Building {} library", name);
             build_fn();
 
