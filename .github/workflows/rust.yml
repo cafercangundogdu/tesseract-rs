@@ -201,7 +201,7 @@ jobs:
 
     - name: Check C runtime of the built libraries
       shell: pwsh
-      run: .github/scripts/check-msvc-runtime.ps1 -Expect static
+      run: .github/scripts/check-msvc-runtime.ps1 -Expect static -Exe target\debug\tesseract-rs.exe
 
   coverage:
     runs-on: ubuntu-latest

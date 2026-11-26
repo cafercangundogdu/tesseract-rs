@@ -72,7 +72,9 @@ mod build_tesseract {
         // Everything compiled here depends on the crate version (bundled
         // library versions, source patches, build flags), on the target and,
         // for MSVC, on the C runtime. Each combination gets its own directory
-        // so a build can never pick up artifacts produced for another one.
+        // so that it is not handed libraries built for another one. Compiler
+        // settings taken from the environment (CC, CFLAGS, ...) are not part
+        // of the key; CARGO_CLEAN forces a rebuild after changing those.
         // Only tessdata stays at the top level, where it is shared.
         let version_dir = custom_out_dir.join("build").join(env!("CARGO_PKG_VERSION"));
         let out_dir = version_dir.join(target_dir_name());
@@ -123,31 +125,32 @@ mod build_tesseract {
 
                 // Only modify environ.h if it exists
                 if environ_h_path.exists() {
-                    let environ_h = std::fs::read_to_string(&environ_h_path)
-                        .expect("Failed to read environ.h")
-                        .replace(
+                    patch_source(&environ_h_path, |source| {
+                        let patched = source.replace(
                             "#define  HAVE_LIBZ          1",
                             "#define  HAVE_LIBZ          0",
-                        )
-                        .replace(
-                            "#ifdef  NO_CONSOLE_IO",
-                            "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO",
                         );
-                    std::fs::write(environ_h_path, environ_h).expect("Failed to write environ.h");
+                        // The replacement contains the text it replaces, so
+                        // only apply it once.
+                        let force_no_console_io = "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO";
+                        if patched.contains(force_no_console_io) {
+                            patched
+                        } else {
+                            patched.replace("#ifdef  NO_CONSOLE_IO", force_no_console_io)
+                        }
+                    });
                 }
 
                 let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
 
                 // Only modify makefile.static if it exists
                 if makefile_static_path.exists() {
-                    let makefile_static = std::fs::read_to_string(&makefile_static_path)
-                        .expect("Failed to read makefile.static")
-                        .replace(
+                    patch_source(&makefile_static_path, |source| {
+                        source.replace(
                             "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
                             "ALL_LIBS =	$(LEPTLIB) -lm",
-                        );
-                    std::fs::write(makefile_static_path, makefile_static)
-                        .expect("Failed to write makefile.static");
+                        )
+                    });
                 }
 
                 // Configure build tools
@@ -210,11 +213,9 @@ mod build_tesseract {
             &tesseract_install_dir,
             || {
                 let cmakelists_path = tesseract_dir.join("CMakeLists.txt");
-                let cmakelists = std::fs::read_to_string(&cmakelists_path)
-                    .expect("Failed to read CMakeLists.txt")
-                    .replace("set(HAVE_TIFFIO_H ON)", "");
-                std::fs::write(&cmakelists_path, cmakelists)
-                    .expect("Failed to write CMakeLists.txt");
+                patch_source(&cmakelists_path, |source| {
+                    source.replace("set(HAVE_TIFFIO_H ON)", "")
+                });
 
                 let mut tesseract_config = Config::new(&tesseract_dir);
                 // Configure build tools
@@ -583,6 +584,20 @@ mod build_tesseract {
                 }
             }
             println!("cargo:warning={} downloaded", filename);
+        }
+    }
+
+    /// Apply `patch` to a bundled source file, writing it back only when that
+    /// changes its contents. The source tree is watched with
+    /// `rerun-if-changed`, so rewriting a file that is already patched would
+    /// make cargo run the build script again on the next build.
+    fn patch_source(path: &Path, patch: impl FnOnce(&str) -> String) {
+        let original = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+        let patched = patch(&original);
+        if patched != original {
+            fs::write(path, patched)
+                .unwrap_or_else(|e| panic!("Failed to write {}: {}", path.display(), e));
         }
     }
 

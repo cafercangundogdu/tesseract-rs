@@ -4,10 +4,15 @@
 #
 #   -Expect dynamic   /MD: objects ask for MSVCRT
 #   -Expect static    /MT: objects ask for LIBCMT
+#
+# With -Exe, the DLL imports of a linked executable are listed too, and for
+# the static runtime it must not import any C runtime DLL.
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('dynamic', 'static')]
-    [string]$Expect
+    [string]$Expect,
+
+    [string]$Exe
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,3 +65,26 @@ foreach ($name in 'leptonica', 'tesseract') {
 }
 
 Write-Host "Both libraries use the $Expect C runtime."
+
+if ($Exe) {
+    if (-not (Test-Path $Exe)) {
+        throw "$Exe does not exist"
+    }
+
+    $output = dumpbin /nologo /dependents $Exe
+    if ($LASTEXITCODE -ne 0) {
+        throw "dumpbin failed for $Exe"
+    }
+
+    $dlls = @($output |
+        Select-String -Pattern '^\s+(\S+\.dll)\s*$' |
+        ForEach-Object { $_.Matches[0].Groups[1].Value.ToLower() } |
+        Sort-Object -Unique)
+
+    Write-Host "$Exe imports: $($dlls -join ', ')"
+
+    $runtimeDlls = @($dlls | Where-Object { $_ -match '^(vcruntime|msvcp|ucrtbase|api-ms-win-crt-)' })
+    if ($Expect -eq 'static' -and $runtimeDlls.Count -gt 0) {
+        throw "$Exe imports the dynamic C runtime: $($runtimeDlls -join ', ')"
+    }
+}

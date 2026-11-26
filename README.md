@@ -124,7 +124,7 @@ The cache includes:
 
 The training data files are automatically downloaded and placed in the appropriate `tessdata` subdirectory during the build process. You don't need to manually set up the tessdata directory unless you want to use a custom location.
 
-Sources and compiled libraries are kept under `build/<crate version>/`, with one subdirectory per target (for example `x86_64-unknown-linux-gnu`). Different versions of this crate, different targets and, on Windows, different C runtimes therefore never share build output. Directories that belong to versions you no longer use can be deleted. The `tessdata` directory is shared by all of them.
+Sources and compiled libraries are kept under `build/<crate version>/`, with one subdirectory per target (for example `x86_64-unknown-linux-gnu`). Different versions of this crate, different targets and, on Windows, different C runtimes therefore do not share build output. Compiler settings taken from the environment (`CC`, `CFLAGS`, ...) are not part of that layout, so run a build with `CARGO_CLEAN=1` after changing them. Directories that belong to versions you no longer use can be deleted. The `tessdata` directory is shared by all of them.
 
 ## Testing
 
