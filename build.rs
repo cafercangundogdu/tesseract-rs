@@ -451,7 +451,7 @@ mod build_tesseract {
             let file_path = file.enclosed_name().unwrap_or_else(|| {
                 panic!(
                     "Refusing to extract unsafe path {:?} from the {} archive",
-                    file.name(),
+                    String::from_utf8_lossy(file.name_raw()),
                     name
                 )
             });
