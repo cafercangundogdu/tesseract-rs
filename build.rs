@@ -260,17 +260,7 @@ mod build_tesseract {
         println!("cargo:rerun-if-changed={}", leptonica_dir.display());
         println!("cargo:rerun-if-changed={}", tesseract_dir.display());
 
-        println!(
-            "cargo:rustc-link-search=native={}",
-            leptonica_lib_dir.display()
-        );
-        println!(
-            "cargo:rustc-link-search=native={}",
-            tesseract_install_dir.join("lib").display()
-        );
-        // Don't emit link directives here - let build_or_use_cached handle it
-
-        set_os_specific_link_flags();
+        emit_link_directives(&leptonica_install_dir, &tesseract_install_dir);
 
         println!(
             "cargo:warning=Leptonica include dir: {:?}",
@@ -375,7 +365,18 @@ mod build_tesseract {
         (cmake_cxx_flags, additional_defines)
     }
 
-    fn set_os_specific_link_flags() {
+    fn emit_link_directives(leptonica_install_dir: &Path, tesseract_install_dir: &Path) {
+        println!(
+            "cargo:rustc-link-search=native={}",
+            leptonica_install_dir.join("lib").display()
+        );
+        println!("cargo:rustc-link-lib=static=leptonica");
+        println!(
+            "cargo:rustc-link-search=native={}",
+            tesseract_install_dir.join("lib").display()
+        );
+        println!("cargo:rustc-link-lib=static=tesseract");
+
         if cfg!(target_os = "macos") {
             println!("cargo:rustc-link-lib=c++");
         } else if cfg!(target_os = "linux") {
@@ -700,17 +701,6 @@ mod build_tesseract {
                 }
             }
         }
-
-        println!(
-            "cargo:rustc-link-search=native={}",
-            install_dir.join("lib").display()
-        );
-
-        // The actual built library (any of possible_lib_names, including the
-        // MSVC debug "d"-suffixed variant) is copied to the generic
-        // "{name}.lib" / "lib{name}.a" above, so a single generic link works
-        // for both debug and release without hardcoding a versioned name.
-        println!("cargo:rustc-link-lib=static={}", name);
     }
 }
 
