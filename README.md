@@ -97,7 +97,7 @@ The following environment variables affect the build and test process:
 
 ### Build Variables
 
-- `CARGO_CLEAN`: If set, cleans the cache directory before building
+- `CARGO_CLEAN`: If set, removes the cached build for the current target before building
 - `RUSTC_WRAPPER`: If set to "sccache", enables compiler caching with sccache
 - `CC`: Compiler selection for C code (affects Linux builds)
 - `HOME` (Unix) or `APPDATA` (Windows): Used to determine cache directory location
@@ -123,6 +123,8 @@ The cache includes:
 - Third-party source code
 
 The training data files are automatically downloaded and placed in the appropriate `tessdata` subdirectory during the build process. You don't need to manually set up the tessdata directory unless you want to use a custom location.
+
+Sources and compiled libraries are kept under `build/<crate version>/`, with one subdirectory per target (for example `x86_64-unknown-linux-gnu`). Different versions of this crate, different targets and, on Windows, different C runtimes therefore do not share build output. Compiler settings taken from the environment (`CC`, `CFLAGS`, ...) are not part of that layout, so run a build with `CARGO_CLEAN=1` after changing them. Directories that belong to versions you no longer use can be deleted. The `tessdata` directory is shared by all of them.
 
 ## Testing
 
@@ -434,6 +436,16 @@ To clean the cache and force a rebuild:
 
 ```bash
 CARGO_CLEAN=1 cargo build
+```
+
+### Static C runtime on Windows
+
+On MSVC targets the bundled libraries are compiled against the same C runtime as your Rust code: the dynamic one (`/MD`) by default, and the static one (`/MT`) when the `crt-static` target feature is enabled:
+
+```toml
+# .cargo/config.toml
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
 ```
 
 ## Documentation

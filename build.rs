@@ -69,17 +69,28 @@ mod build_tesseract {
 
         println!("cargo:warning=custom_out_dir: {:?}", custom_out_dir);
 
-        let cache_dir = custom_out_dir.join("cache");
+        // Everything compiled here depends on the crate version (bundled
+        // library versions, source patches, build flags), on the target and,
+        // for MSVC, on the C runtime. Each combination gets its own directory
+        // so that it is not handed libraries built for another one. Compiler
+        // settings taken from the environment (CC, CFLAGS, ...) are not part
+        // of the key; CARGO_CLEAN forces a rebuild after changing those.
+        // Only tessdata stays at the top level, where it is shared.
+        let version_dir = custom_out_dir.join("build").join(env!("CARGO_PKG_VERSION"));
+        let out_dir = version_dir.join(target_dir_name());
 
+        // Without this cargo would not rerun the build script when the
+        // variable is set, and the clean request would be ignored.
+        println!("cargo:rerun-if-env-changed=CARGO_CLEAN");
         if env::var("CARGO_CLEAN").is_ok() {
-            clean_cache(&cache_dir);
+            clean_build_dir(&out_dir);
         }
 
+        let cache_dir = out_dir.join("cache");
         std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
 
-        let out_dir = custom_out_dir.clone();
         let project_dir = custom_out_dir.clone();
-        let third_party_dir = project_dir.join("third_party");
+        let third_party_dir = version_dir.join("third_party");
 
         let leptonica_dir = if third_party_dir.join("leptonica").exists() {
             println!("cargo:warning=Using existing leptonica source");
@@ -114,31 +125,32 @@ mod build_tesseract {
 
                 // Only modify environ.h if it exists
                 if environ_h_path.exists() {
-                    let environ_h = std::fs::read_to_string(&environ_h_path)
-                        .expect("Failed to read environ.h")
-                        .replace(
+                    patch_source(&environ_h_path, |source| {
+                        let patched = source.replace(
                             "#define  HAVE_LIBZ          1",
                             "#define  HAVE_LIBZ          0",
-                        )
-                        .replace(
-                            "#ifdef  NO_CONSOLE_IO",
-                            "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO",
                         );
-                    std::fs::write(environ_h_path, environ_h).expect("Failed to write environ.h");
+                        // The replacement contains the text it replaces, so
+                        // only apply it once.
+                        let force_no_console_io = "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO";
+                        if patched.contains(force_no_console_io) {
+                            patched
+                        } else {
+                            patched.replace("#ifdef  NO_CONSOLE_IO", force_no_console_io)
+                        }
+                    });
                 }
 
                 let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
 
                 // Only modify makefile.static if it exists
                 if makefile_static_path.exists() {
-                    let makefile_static = std::fs::read_to_string(&makefile_static_path)
-                        .expect("Failed to read makefile.static")
-                        .replace(
+                    patch_source(&makefile_static_path, |source| {
+                        source.replace(
                             "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
                             "ALL_LIBS =	$(LEPTLIB) -lm",
-                        );
-                    std::fs::write(makefile_static_path, makefile_static)
-                        .expect("Failed to write makefile.static");
+                        )
+                    });
                 }
 
                 // Configure build tools
@@ -158,6 +170,10 @@ mod build_tesseract {
                         .env("CXX", "sccache c++");
                 }
                 leptonica_config
+                    // `profile` also selects the configuration built by
+                    // multi-config generators (Visual Studio), which would
+                    // otherwise follow the cargo profile.
+                    .profile("Release")
                     .define("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_PROG", "OFF")
@@ -176,13 +192,6 @@ mod build_tesseract {
                     .define("HAVE_LIBZ", "0")
                     .define("ENABLE_LTO", "OFF")
                     .define("CMAKE_INSTALL_PREFIX", &leptonica_install_dir);
-
-                // Windows-specific defines
-                if cfg!(target_os = "windows") {
-                    leptonica_config
-                        .define("CMAKE_C_FLAGS_RELEASE", "/MD /O2")
-                        .define("CMAKE_C_FLAGS_DEBUG", "/MDd /Od");
-                }
 
                 for (key, value) in &additional_defines {
                     leptonica_config.define(key, value);
@@ -204,11 +213,9 @@ mod build_tesseract {
             &tesseract_install_dir,
             || {
                 let cmakelists_path = tesseract_dir.join("CMakeLists.txt");
-                let cmakelists = std::fs::read_to_string(&cmakelists_path)
-                    .expect("Failed to read CMakeLists.txt")
-                    .replace("set(HAVE_TIFFIO_H ON)", "");
-                std::fs::write(&cmakelists_path, cmakelists)
-                    .expect("Failed to write CMakeLists.txt");
+                patch_source(&cmakelists_path, |source| {
+                    source.replace("set(HAVE_TIFFIO_H ON)", "")
+                });
 
                 let mut tesseract_config = Config::new(&tesseract_dir);
                 // Configure build tools
@@ -228,6 +235,7 @@ mod build_tesseract {
                         .env("CXX", "sccache c++");
                 }
                 tesseract_config
+                    .profile("Release")
                     .define("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
                     .define("CMAKE_BUILD_TYPE", "Release")
                     .define("BUILD_TRAINING_TOOLS", "OFF")
@@ -352,15 +360,34 @@ mod build_tesseract {
         } else if cfg!(target_os = "windows") {
             // Windows-specific MSVC flags
             cmake_cxx_flags.push_str("/EHsc /MP /std:c++17 ");
-            additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/MD /O2".to_string()));
-            additional_defines.push(("CMAKE_CXX_FLAGS_DEBUG".to_string(), "/MDd /Od".to_string()));
+            // No /MD or /MT here: the runtime is selected through
+            // CMAKE_MSVC_RUNTIME_LIBRARY below, and a flag in the per-config
+            // variables would override it.
+            additional_defines.push(("CMAKE_C_FLAGS_RELEASE".to_string(), "/O2".to_string()));
+            additional_defines.push(("CMAKE_CXX_FLAGS_RELEASE".to_string(), "/O2".to_string()));
             additional_defines.push((
                 "CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS".to_string(),
                 "ON".to_string(),
             ));
+            // Link the same C runtime as the Rust code these libraries end up
+            // in: static with `-C target-feature=+crt-static`, dynamic
+            // otherwise. rustc always uses the release runtime, so there is
+            // no debug variant to select.
+            let runtime_library = if crt_static() {
+                "MultiThreaded"
+            } else {
+                "MultiThreadedDLL"
+            };
             additional_defines.push((
                 "CMAKE_MSVC_RUNTIME_LIBRARY".to_string(),
-                "MultiThreadedDLL".to_string(),
+                runtime_library.to_string(),
+            ));
+            // CMAKE_MSVC_RUNTIME_LIBRARY is ignored unless policy CMP0091 is
+            // NEW. Tesseract enables it itself, but Leptonica's minimum CMake
+            // version predates the policy, so opt in explicitly.
+            additional_defines.push((
+                "CMAKE_POLICY_DEFAULT_CMP0091".to_string(),
+                "NEW".to_string(),
             ));
         }
 
@@ -560,10 +587,46 @@ mod build_tesseract {
         }
     }
 
-    fn clean_cache(cache_dir: &Path) {
-        println!("Cleaning cache directory: {:?}", cache_dir);
-        if cache_dir.exists() {
-            fs::remove_dir_all(cache_dir).expect("Failed to remove cache directory");
+    /// Apply `patch` to a bundled source file, writing it back only when that
+    /// changes its contents. The source tree is watched with
+    /// `rerun-if-changed`, so rewriting a file that is already patched would
+    /// make cargo run the build script again on the next build.
+    fn patch_source(path: &Path, patch: impl FnOnce(&str) -> String) {
+        let original = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+        let patched = patch(&original);
+        if patched != original {
+            fs::write(path, patched)
+                .unwrap_or_else(|e| panic!("Failed to write {}: {}", path.display(), e));
+        }
+    }
+
+    /// Whether rustc links the static C runtime for this target
+    /// (`-C target-feature=+crt-static`).
+    fn crt_static() -> bool {
+        env::var("CARGO_CFG_TARGET_FEATURE")
+            .map(|features| features.split(',').any(|f| f == "crt-static"))
+            .unwrap_or(false)
+    }
+
+    /// Directory name for the artifacts of the current target, e.g.
+    /// `aarch64-apple-darwin` or `x86_64-pc-windows-msvc-crt-static`.
+    fn target_dir_name() -> String {
+        let mut name = env::var("TARGET").expect("TARGET not set");
+        // The C runtime only changes the compiled libraries on MSVC.
+        let msvc = env::var("CARGO_CFG_TARGET_ENV").is_ok_and(|env| env == "msvc");
+        if msvc && crt_static() {
+            name.push_str("-crt-static");
+        }
+        name
+    }
+
+    /// Remove the cached libraries and install trees of the current target so
+    /// they are rebuilt from scratch.
+    fn clean_build_dir(build_dir: &Path) {
+        println!("Cleaning build directory: {:?}", build_dir);
+        if build_dir.exists() {
+            fs::remove_dir_all(build_dir).expect("Failed to remove build directory");
         }
     }
 

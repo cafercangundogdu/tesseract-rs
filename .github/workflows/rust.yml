@@ -99,9 +99,10 @@ jobs:
           ${{ runner.os == 'Windows' && 'C:\Users\runneradmin\AppData\Roaming\tesseract-rs' || '' }}
           ${{ runner.os == 'macOS' && '~/Library/Application Support/tesseract-rs' || '' }}
           ${{ runner.os == 'Linux' && '~/.tesseract-rs' || '' }}
+        # No restore-keys on purpose: a prefix match would bring back
+        # libraries compiled by an older build.rs, and the build would reuse
+        # them instead of testing the current flags.
         key: ${{ runner.os }}-tesseract-artifacts-${{ hashFiles('build.rs', 'Cargo.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-tesseract-artifacts-
     
     - name: Setup MSVC environment (Windows)
       if: matrix.os == 'windows-latest'
@@ -138,7 +139,70 @@ jobs:
         # also covers the on-demand tessdata download.
         TESSERACT_EMBED_LANGUAGES: eng,heb
         RUSTC_WRAPPER: ""
+
+    - name: Check C runtime of the built libraries (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: .github/scripts/check-msvc-runtime.ps1 -Expect dynamic
     
+  # MSVC with the static C runtime (`-C target-feature=+crt-static`).
+  # Unlike the Windows build above, this job does not load the MSVC developer
+  # environment before building, so CMake uses the Visual Studio generator
+  # instead of NMake. That is what a plain `cargo build` does on most machines.
+  windows-crt-static:
+    runs-on: windows-latest
+    env:
+      RUSTFLAGS: -C target-feature=+crt-static
+      RUSTC_WRAPPER: ""
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install dependencies
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        choco install visualstudio2022buildtools
+        choco install visualstudio2022-workload-vctools
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v1-rust"
+        key: "build-windows-crt-static"
+
+    - name: Cache build artifacts
+      uses: actions/cache@v3
+      with:
+        path: C:\Users\runneradmin\AppData\Roaming\tesseract-rs
+        key: ${{ runner.os }}-tesseract-artifacts-crt-static-${{ hashFiles('build.rs', 'Cargo.toml') }}
+
+    - name: Fix Windows linking (Rename Git's link.exe)
+      shell: pwsh
+      run: |
+        $gitLinkPath = "C:\Program Files\Git\usr\bin\link.exe"
+        if (Test-Path $gitLinkPath) {
+          Rename-Item $gitLinkPath -NewName "link_git.exe" -Force
+          echo "Renamed Git's link.exe to link_git.exe"
+        }
+
+    - name: Build
+      run: |
+        cargo build --verbose
+        cargo build -p tesseract-rs-cli --verbose
+
+    - name: Run tests
+      run: cargo test --verbose
+
+    # dumpbin is only on PATH inside the developer environment.
+    - name: Setup MSVC environment
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Check C runtime of the built libraries
+      shell: pwsh
+      run: .github/scripts/check-msvc-runtime.ps1 -Expect static -Exe target\debug\tesseract-rs.exe
+
   coverage:
     runs-on: ubuntu-latest
     steps:
@@ -159,8 +223,6 @@ jobs:
         path: |
           ~/.tesseract-rs
         key: ${{ runner.os }}-tesseract-artifacts-coverage-${{ hashFiles('build.rs', 'Cargo.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-tesseract-artifacts-coverage-
     
     - name: Install dependencies
       run: |
