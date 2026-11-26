@@ -203,6 +203,23 @@ jobs:
       shell: pwsh
       run: .github/scripts/check-msvc-runtime.ps1 -Expect static -Exe target\debug\tesseract-rs.exe
 
+  # Fedora installs CMake projects into lib64 by default (GNUInstallDirs),
+  # unlike the Debian-based runners above. RHEL, AlmaLinux (the manylinux_2_28
+  # base) and openSUSE behave the same way.
+  fedora:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+    - name: Install dependencies
+      run: dnf -y install cargo rust cmake gcc gcc-c++ make git
+
+    - uses: actions/checkout@v4
+
+    - name: Run tests
+      run: cargo test --verbose
+      env:
+        RUSTC_WRAPPER: ""
+
   coverage:
     runs-on: ubuntu-latest
     steps:

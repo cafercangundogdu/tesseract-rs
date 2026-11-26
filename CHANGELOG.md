@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-11-26
+
+### Fixed
+- The bundled build failed on Fedora, RHEL, AlmaLinux (including the
+  manylinux_2_28 images) and other distributions where CMake installs into
+  `lib64`. Leptonica 1.87.0 and Tesseract 5.5.2 put their libraries there,
+  while the build script looks in `lib`, so linking stopped with
+  "could not find native static library `leptonica`". The install directory
+  is now pinned to `lib`. Versions 0.3.0 to 0.4.1 are affected.
+
 ## [0.4.1] - 2026-11-26
 
 ### Security
