@@ -114,6 +114,7 @@ mod build_tesseract {
 
         let (cmake_cxx_flags, additional_defines) = get_os_specific_config();
 
+        let cargo_out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR not set"));
         let leptonica_install_dir = out_dir.join("leptonica");
         let leptonica_cache_dir = cache_dir.join("leptonica");
 
@@ -123,6 +124,7 @@ mod build_tesseract {
             &leptonica_install_dir,
             || {
                 let mut leptonica_config = Config::new(&leptonica_dir);
+                leptonica_config.out_dir(cargo_out_dir.join("leptonica"));
 
                 // Configure build tools
                 if cfg!(target_os = "windows") {
@@ -172,6 +174,7 @@ mod build_tesseract {
 
         let leptonica_include_dir = leptonica_install_dir.join("include");
         let leptonica_lib_dir = leptonica_install_dir.join("lib");
+        let tesseract_build_dir = cargo_out_dir.join("tesseract");
         let tesseract_install_dir = out_dir.join("tesseract");
         let tesseract_cache_dir = cache_dir.join("tesseract");
         let tessdata_prefix = project_dir.join("tessdata");
@@ -188,6 +191,7 @@ mod build_tesseract {
             &tesseract_install_dir,
             || {
                 let mut tesseract_config = Config::new(&tesseract_dir);
+                tesseract_config.out_dir(&tesseract_build_dir);
                 // Configure build tools
                 if cfg!(target_os = "windows") {
                     // Use NMake on Windows for better compatibility
