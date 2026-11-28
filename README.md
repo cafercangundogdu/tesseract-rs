@@ -124,7 +124,7 @@ The cache includes:
 
 The training data files are automatically downloaded and placed in the appropriate `tessdata` subdirectory during the build process. You don't need to manually set up the tessdata directory unless you want to use a custom location.
 
-Sources and compiled libraries are kept under `build/<crate version>/`, with one subdirectory per target (for example `x86_64-unknown-linux-gnu`). Different versions of this crate, different targets and, on Windows, different C runtimes therefore do not share build output. Compiler settings taken from the environment (`CC`, `CFLAGS`, ...) are not part of that layout, so run a build with `CARGO_CLEAN=1` after changing them. Directories that belong to versions you no longer use can be deleted. The `tessdata` directory is shared by all of them.
+Sources and compiled libraries are kept under `build2/<crate version>/`, with one subdirectory per target (for example `x86_64-unknown-linux-gnu`). Different versions of this crate, different targets and, on Windows, different C runtimes therefore do not share build output. Compiler settings taken from the environment (`CC`, `CFLAGS`, ...) are not part of that layout, so run a build with `CARGO_CLEAN=1` after changing them. The old `build/` directory can be removed once older checkouts no longer need it. The `tessdata` directory is shared by all of them.
 
 ## Testing
 
@@ -451,6 +451,18 @@ rustflags = ["-C", "target-feature=+crt-static"]
 ## Documentation
 
 For more detailed information, please check the [API documentation](https://docs.rs/tesseract-rs).
+
+### Bundled-build diagnostic limitations
+
+Bundled builds disable the bitmap fonts used to caption Tesseract's diagnostic
+images (`TESSERACT_DISABLE_DEBUG_FONTS`). Normal OCR results are unaffected, but
+captioned diagnostic images are not fully supported. Options such as
+`tessedit_dump_pageseg_images`, `textord_tabfind_show_images`, and
+`devanagari_split_debugimage`, enabled through the variable/configuration APIs,
+may produce uncaptioned images and `no bitmap fonts; returning a copy` errors.
+Accepting a diagnostic option does not guarantee that its output is supported.
+This limitation does not apply to system builds unless their Tesseract was
+configured similarly.
 
 ## License
 

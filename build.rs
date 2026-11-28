@@ -70,13 +70,17 @@ mod build_tesseract {
         println!("cargo:warning=custom_out_dir: {:?}", custom_out_dir);
 
         // Everything compiled here depends on the crate version (bundled
-        // library versions, source patches, build flags), on the target and,
+        // library versions and build flags), on the target and,
         // for MSVC, on the C runtime. Each combination gets its own directory
         // so that it is not handed libraries built for another one. Compiler
         // settings taken from the environment (CC, CFLAGS, ...) are not part
         // of the key; CARGO_CLEAN forces a rebuild after changing those.
         // Only tessdata stays at the top level, where it is shared.
-        let version_dir = custom_out_dir.join("build").join(env!("CARGO_PKG_VERSION"));
+        // The old build tree may contain patched sources and archives
+        // built from them. Use a new root for both.
+        let version_dir = custom_out_dir
+            .join("build2")
+            .join(env!("CARGO_PKG_VERSION"));
         let out_dir = version_dir.join(target_dir_name());
 
         // Without this cargo would not rerun the build script when the
@@ -110,6 +114,7 @@ mod build_tesseract {
 
         let (cmake_cxx_flags, additional_defines) = get_os_specific_config();
 
+        let cargo_out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR not set"));
         let leptonica_install_dir = out_dir.join("leptonica");
         let leptonica_cache_dir = cache_dir.join("leptonica");
 
@@ -119,39 +124,7 @@ mod build_tesseract {
             &leptonica_install_dir,
             || {
                 let mut leptonica_config = Config::new(&leptonica_dir);
-
-                let leptonica_src_dir = leptonica_dir.join("src");
-                let environ_h_path = leptonica_src_dir.join("environ.h");
-
-                // Only modify environ.h if it exists
-                if environ_h_path.exists() {
-                    patch_source(&environ_h_path, |source| {
-                        let patched = source.replace(
-                            "#define  HAVE_LIBZ          1",
-                            "#define  HAVE_LIBZ          0",
-                        );
-                        // The replacement contains the text it replaces, so
-                        // only apply it once.
-                        let force_no_console_io = "#define NO_CONSOLE_IO\n#ifdef  NO_CONSOLE_IO";
-                        if patched.contains(force_no_console_io) {
-                            patched
-                        } else {
-                            patched.replace("#ifdef  NO_CONSOLE_IO", force_no_console_io)
-                        }
-                    });
-                }
-
-                let makefile_static_path = leptonica_dir.join("prog").join("makefile.static");
-
-                // Only modify makefile.static if it exists
-                if makefile_static_path.exists() {
-                    patch_source(&makefile_static_path, |source| {
-                        source.replace(
-                            "ALL_LIBS =	$(LEPTLIB) -ltiff -ljpeg -lpng -lz -lm",
-                            "ALL_LIBS =	$(LEPTLIB) -lm",
-                        )
-                    });
-                }
+                leptonica_config.out_dir(cargo_out_dir.join("leptonica"));
 
                 // Configure build tools
                 if cfg!(target_os = "windows") {
@@ -185,9 +158,7 @@ mod build_tesseract {
                     .define("ENABLE_WEBP", "OFF")
                     .define("ENABLE_OPENJPEG", "OFF")
                     .define("ENABLE_GIF", "OFF")
-                    .define("NO_CONSOLE_IO", "ON")
                     .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags)
-                    .define("MINIMUM_SEVERITY", "L_SEVERITY_NONE")
                     .define("SW_BUILD", "OFF")
                     .define("HAVE_LIBZ", "0")
                     .define("ENABLE_LTO", "OFF")
@@ -203,21 +174,24 @@ mod build_tesseract {
 
         let leptonica_include_dir = leptonica_install_dir.join("include");
         let leptonica_lib_dir = leptonica_install_dir.join("lib");
+        let tesseract_build_dir = cargo_out_dir.join("tesseract");
         let tesseract_install_dir = out_dir.join("tesseract");
         let tesseract_cache_dir = cache_dir.join("tesseract");
         let tessdata_prefix = project_dir.join("tessdata");
+        // Keep recognition images in memory without PNG encoding/decoding.
+        // The bitmap fonts for diagnostic captions require TIFF support.
+        let tesseract_cxx_flags = format!(
+            "{}-DTESSERACT_IMAGEDATA_AS_PIX -DTESSERACT_DISABLE_DEBUG_FONTS",
+            cmake_cxx_flags
+        );
 
         build_or_use_cached(
             "tesseract",
             &tesseract_cache_dir,
             &tesseract_install_dir,
             || {
-                let cmakelists_path = tesseract_dir.join("CMakeLists.txt");
-                patch_source(&cmakelists_path, |source| {
-                    source.replace("set(HAVE_TIFFIO_H ON)", "")
-                });
-
                 let mut tesseract_config = Config::new(&tesseract_dir);
+                tesseract_config.out_dir(&tesseract_build_dir);
                 // Configure build tools
                 if cfg!(target_os = "windows") {
                     // Use NMake on Windows for better compatibility
@@ -275,7 +249,7 @@ mod build_tesseract {
                     .define("LEPT_TIFF_RESULT", "FALSE")
                     .define("INSTALL_CONFIGS", "ON")
                     .define("USE_SYSTEM_ICU", "ON")
-                    .define("CMAKE_CXX_FLAGS", &cmake_cxx_flags);
+                    .define("CMAKE_CXX_FLAGS", &tesseract_cxx_flags);
 
                 for (key, value) in &additional_defines {
                     tesseract_config.define(key, value);
@@ -290,17 +264,7 @@ mod build_tesseract {
         println!("cargo:rerun-if-changed={}", leptonica_dir.display());
         println!("cargo:rerun-if-changed={}", tesseract_dir.display());
 
-        println!(
-            "cargo:rustc-link-search=native={}",
-            leptonica_lib_dir.display()
-        );
-        println!(
-            "cargo:rustc-link-search=native={}",
-            tesseract_install_dir.join("lib").display()
-        );
-        // Don't emit link directives here - let build_or_use_cached handle it
-
-        set_os_specific_link_flags();
+        emit_link_directives(&leptonica_install_dir, &tesseract_install_dir);
 
         println!(
             "cargo:warning=Leptonica include dir: {:?}",
@@ -341,11 +305,7 @@ mod build_tesseract {
         } else if cfg!(target_os = "linux") {
             cmake_cxx_flags.push_str("-std=c++17 ");
             // Check if we're on a system using clang
-            if cfg!(target_env = "musl")
-                || env::var("CC")
-                    .map(|cc| cc.contains("clang"))
-                    .unwrap_or(false)
-            {
+            if linux_uses_clang() {
                 cmake_cxx_flags.push_str("-stdlib=libc++ ");
                 additional_defines.push(("CMAKE_CXX_COMPILER".to_string(), "clang++".to_string()));
             } else {
@@ -405,15 +365,29 @@ mod build_tesseract {
         (cmake_cxx_flags, additional_defines)
     }
 
-    fn set_os_specific_link_flags() {
+    fn linux_uses_clang() -> bool {
+        cfg!(target_env = "musl")
+            || env::var("CC")
+                .map(|cc| cc.contains("clang"))
+                .unwrap_or(false)
+    }
+
+    fn emit_link_directives(leptonica_install_dir: &Path, tesseract_install_dir: &Path) {
+        println!(
+            "cargo:rustc-link-search=native={}",
+            leptonica_install_dir.join("lib").display()
+        );
+        println!("cargo:rustc-link-lib=static=leptonica");
+        println!(
+            "cargo:rustc-link-search=native={}",
+            tesseract_install_dir.join("lib").display()
+        );
+        println!("cargo:rustc-link-lib=static=tesseract");
+
         if cfg!(target_os = "macos") {
             println!("cargo:rustc-link-lib=c++");
         } else if cfg!(target_os = "linux") {
-            if cfg!(target_env = "musl")
-                || env::var("CC")
-                    .map(|cc| cc.contains("clang"))
-                    .unwrap_or(false)
-            {
+            if linux_uses_clang() {
                 println!("cargo:rustc-link-lib=c++");
             } else {
                 println!("cargo:rustc-link-lib=stdc++");
@@ -591,20 +565,6 @@ mod build_tesseract {
         }
     }
 
-    /// Apply `patch` to a bundled source file, writing it back only when that
-    /// changes its contents. The source tree is watched with
-    /// `rerun-if-changed`, so rewriting a file that is already patched would
-    /// make cargo run the build script again on the next build.
-    fn patch_source(path: &Path, patch: impl FnOnce(&str) -> String) {
-        let original = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
-        let patched = patch(&original);
-        if patched != original {
-            fs::write(path, patched)
-                .unwrap_or_else(|e| panic!("Failed to write {}: {}", path.display(), e));
-        }
-    }
-
     /// Whether rustc links the static C runtime for this target
     /// (`-C target-feature=+crt-static`).
     fn crt_static() -> bool {
@@ -654,15 +614,14 @@ mod build_tesseract {
                 // MSVC debug builds append a "d" suffix to the library name, so
                 // list both release and debug variants (see issue #17).
                 "leptonica" => vec![
-                    "leptonica.lib".to_string(),
                     "libleptonica.lib".to_string(),
                     "leptonica-static.lib".to_string(),
                     "leptonica-1.87.0.lib".to_string(),
                     "leptonica-1.87.0d.lib".to_string(),
                     "leptonicad.lib".to_string(),
+                    "leptonica.lib".to_string(),
                 ],
                 "tesseract" => vec![
-                    "tesseract.lib".to_string(),
                     "libtesseract.lib".to_string(),
                     "tesseract-static.lib".to_string(),
                     "tesseract55.lib".to_string(),
@@ -671,6 +630,7 @@ mod build_tesseract {
                     "tesseract55d.lib".to_string(),
                     "tesseract54d.lib".to_string(),
                     "tesseract53d.lib".to_string(),
+                    "tesseract.lib".to_string(),
                 ],
                 _ => vec![format!("{}.lib", name)],
             }
@@ -681,14 +641,18 @@ mod build_tesseract {
         fs::create_dir_all(cache_dir).expect("Failed to create cache directory");
         fs::create_dir_all(out_path.parent().unwrap()).expect("Failed to create output directory");
 
-        if cached_path.exists() {
-            println!("Using cached {} library", name);
-            if let Err(e) = fs::copy(&cached_path, &out_path) {
-                println!("cargo:warning=Failed to copy cached library: {}", e);
-                // If cache copy fails, rebuild
-                build_fn();
-            }
-        } else {
+        let restored = cached_path.exists()
+            && match fs::copy(&cached_path, &out_path) {
+                Ok(_) => {
+                    println!("Using cached {} library", name);
+                    true
+                }
+                Err(e) => {
+                    println!("cargo:warning=Failed to copy cached library: {}", e);
+                    false
+                }
+            };
+        if !restored {
             println!("Building {} library", name);
             build_fn();
 
@@ -708,8 +672,9 @@ mod build_tesseract {
             }
 
             if let Some(lib_path) = found_lib_path {
-                // Copy to expected location for caching
-                if !out_path.exists() {
+                // Refresh a canonical copy left by an earlier build. Skip
+                // the copy when CMake already installed under that name.
+                if lib_path != out_path {
                     if let Err(e) = fs::copy(&lib_path, &out_path) {
                         println!(
                             "cargo:warning=Failed to copy library to standard location: {}",
@@ -739,17 +704,6 @@ mod build_tesseract {
                 }
             }
         }
-
-        println!(
-            "cargo:rustc-link-search=native={}",
-            install_dir.join("lib").display()
-        );
-
-        // The actual built library (any of possible_lib_names, including the
-        // MSVC debug "d"-suffixed variant) is copied to the generic
-        // "{name}.lib" / "lib{name}.a" above, so a single generic link works
-        // for both debug and release without hardcoding a versioned name.
-        println!("cargo:rustc-link-lib=static={}", name);
     }
 }
 
